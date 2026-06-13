@@ -227,7 +227,8 @@ function autoCaption(filename, index) {
   if (lower.includes("menu")) return "메뉴판";
   if (lower.includes("sate") || lower.includes("사테")) return "사테";
   if (lower.includes("udang") || lower.includes("새우")) return "우당 바카르";
-  if (lower.includes("drink") || lower.includes("jahe")) return "자헤 마두";
+  if (/jahe|madu|자헤|마두|생강|꿀/.test(lower)) return "자헤 마두";
+  if (/drink|beverage|음료|차/.test(lower)) return "음료";
   if (index === 0) return "입구와 분위기";
   return `사진 ${index + 1}`;
 }
@@ -827,7 +828,7 @@ function photoMatchesMenu(photo, menu) {
   const menuText = `${menu.name} ${menu.local}`.toLowerCase();
   if (/sate|사테/.test(menuText) && /sate|사테|꼬치/.test(haystack)) return true;
   if (/udang|우당|새우/.test(menuText) && /udang|우당|새우|shrimp/.test(haystack)) return true;
-  if (/jahe|자헤|madu|마두|생강|꿀/.test(menuText) && /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack)) return true;
+  if (/jahe|자헤|madu|마두|생강|꿀/.test(menuText) && /jahe|자헤|madu|마두|생강|꿀/.test(haystack)) return true;
   return false;
 }
 
@@ -1299,6 +1300,12 @@ function makePhotoPlan(input) {
     size: photo.size || "auto",
     target: photo.target || "auto",
     name: photo.name || "",
+    analysis: photo.analysis || null,
+    autoMatched: Boolean(photo.autoMatched),
+    userEdited: Boolean(photo.userEdited),
+    width: photo.width || 0,
+    height: photo.height || 0,
+    aspectRatio: photo.aspectRatio || 1,
     note: photo.note || photoPlacementNote(photo, input),
     alt: `${input.place || input.topic} ${photo.caption || photo.role}`,
   }));
