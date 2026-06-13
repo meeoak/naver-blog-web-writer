@@ -230,6 +230,10 @@ textarea {
   flex-wrap: wrap;
 }
 
+.action-row .primary-btn {
+  min-width: 132px;
+}
+
 .sub-action-row {
   display: flex;
   align-items: center;
