@@ -12,6 +12,8 @@ const state = {
   isPolished: false,
   thumbnailRenderId: 0,
   aiThumbnailDataUrl: "",
+  thumbnailCandidates: [],
+  selectedThumbnailCandidate: -1,
 };
 
 const aiSmells = [
@@ -85,6 +87,7 @@ function bindEvents() {
   $("downloadThumbBtn").addEventListener("click", downloadThumbnail);
   $("generateAiThumbBtn").addEventListener("click", generateAIThumbnailImage);
   $("clearAiThumbBtn").addEventListener("click", clearAIThumbnailImage);
+  $("thumbnailCandidateList").addEventListener("click", handleThumbnailCandidateClick);
   $("copyPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
     copyText($("postEditor").value);
@@ -237,6 +240,10 @@ function handlePhotos(event) {
   }
 
   let loaded = 0;
+  state.aiThumbnailDataUrl = "";
+  state.thumbnailCandidates = [];
+  state.selectedThumbnailCandidate = -1;
+  renderThumbnailCandidates();
   updatePhotoStatus(`${files.length}장 불러오는 중...`);
   files.forEach((file) => {
     const reader = new FileReader();
@@ -749,11 +756,11 @@ async function generateAIThumbnailImage() {
   const originalLabel = button.textContent;
   button.disabled = true;
   button.classList.add("is-busy");
-  button.textContent = "변환 중";
+  button.textContent = "4개 만드는 중";
   const referencePhoto = thumbnailReferencePhoto();
   setThumbnailAiStatus(referencePhoto
-    ? `"${referencePhoto.caption || referencePhoto.name || "업로드 사진"}"을 기준으로 고퀄 반만화 썸네일 사진으로 변환하는 중이야. 보통 20~60초 정도 걸릴 수 있어.`
-    : "업로드 사진이 없어서 새 썸네일용 연출 사진을 만드는 중이야. 보통 20~60초 정도 걸릴 수 있어.");
+    ? `"${referencePhoto.caption || referencePhoto.name || "업로드 사진"}"을 기준으로 밝은 고퀄 반만화 썸네일 후보 4개를 만드는 중이야. 보통 30~90초 정도 걸릴 수 있어.`
+    : "업로드 사진이 없어서 새 썸네일 후보 4개를 만드는 중이야. 보통 30~90초 정도 걸릴 수 있어.");
 
   try {
     const input = getInput();
@@ -765,14 +772,18 @@ async function generateAIThumbnailImage() {
       const message = data?.error?.message || `AI 썸네일 사진 생성 실패 (${response.status})`;
       throw new Error(message);
     }
-    const imageItem = data?.data?.[0];
-    const dataUrl = await imageResultToDataUrl(imageItem);
-    if (!dataUrl) throw new Error("생성된 이미지를 읽지 못했어.");
-    state.aiThumbnailDataUrl = dataUrl;
+    const candidates = await Promise.all((data?.data || []).slice(0, 4).map((item) => imageResultToDataUrl(item)));
+    state.thumbnailCandidates = candidates
+      .filter(Boolean)
+      .map((dataUrl, index) => ({ id: makeId(), dataUrl, label: `추천 ${index + 1}` }));
+    if (!state.thumbnailCandidates.length) throw new Error("생성된 이미지를 읽지 못했어.");
+    state.selectedThumbnailCandidate = 0;
+    state.aiThumbnailDataUrl = state.thumbnailCandidates[0].dataUrl;
+    renderThumbnailCandidates();
     drawThumbnail();
     setThumbnailAiStatus(referencePhoto
-      ? "AI 썸네일 변환 완료. 업로드 사진을 고퀄 반만화 느낌으로 바꾸고 글자를 다시 얹었어."
-      : "AI 썸네일 사진 생성 완료. 연출 사진 배경을 깔고 글자를 다시 얹었어.");
+      ? `추천 썸네일 ${state.thumbnailCandidates.length}개 완성. 첫 번째 후보를 적용했어. 마음에 드는 후보를 아래에서 골라봐.`
+      : `추천 썸네일 ${state.thumbnailCandidates.length}개 완성. 첫 번째 후보를 적용했어. 마음에 드는 후보를 아래에서 골라봐.`);
   } catch (error) {
     setThumbnailAiStatus(`AI 썸네일 변환 실패: ${friendlyOpenAIError(error.message)}`, true);
   } finally {
@@ -784,8 +795,39 @@ async function generateAIThumbnailImage() {
 
 function clearAIThumbnailImage() {
   state.aiThumbnailDataUrl = "";
+  state.thumbnailCandidates = [];
+  state.selectedThumbnailCandidate = -1;
+  renderThumbnailCandidates();
   drawThumbnail();
   setThumbnailAiStatus("AI 사진을 지우고 업로드 사진 조합 방식으로 돌아갔어.");
+}
+
+function renderThumbnailCandidates() {
+  const list = $("thumbnailCandidateList");
+  if (!list) return;
+  if (!state.thumbnailCandidates.length) {
+    list.innerHTML = "";
+    return;
+  }
+  list.innerHTML = state.thumbnailCandidates.map((candidate, index) => `
+    <button class="thumbnail-candidate${index === state.selectedThumbnailCandidate ? " is-selected" : ""}" type="button" data-candidate-index="${index}">
+      <img src="${candidate.dataUrl}" alt="${candidate.label}">
+      <span>${candidate.label}</span>
+    </button>
+  `).join("");
+}
+
+function handleThumbnailCandidateClick(event) {
+  const button = event.target.closest("[data-candidate-index]");
+  if (!button) return;
+  const index = Number(button.dataset.candidateIndex);
+  const candidate = state.thumbnailCandidates[index];
+  if (!candidate) return;
+  state.selectedThumbnailCandidate = index;
+  state.aiThumbnailDataUrl = candidate.dataUrl;
+  renderThumbnailCandidates();
+  drawThumbnail();
+  setThumbnailAiStatus(`${candidate.label} 썸네일을 적용했어.`);
 }
 
 async function requestThumbnailImageGeneration(apiKey, model, input) {
@@ -800,7 +842,7 @@ async function requestThumbnailImageGeneration(apiKey, model, input) {
       prompt: buildThumbnailImagePrompt(input, false),
       size: "1536x1024",
       quality: "high",
-      n: 1,
+      n: 4,
     }),
   });
 }
@@ -811,7 +853,7 @@ async function requestThumbnailImageEdit(apiKey, model, input, photo) {
   formData.append("prompt", buildThumbnailImagePrompt(input, true));
   formData.append("size", "1536x1024");
   formData.append("quality", "high");
-  formData.append("n", "1");
+  formData.append("n", "4");
   const referenceBlob = await makeThumbnailReferenceBlob(photo.dataUrl);
   formData.append("image", referenceBlob, "thumbnail-reference.png");
 
@@ -863,12 +905,13 @@ function buildThumbnailImagePrompt(input, hasReference = false) {
     ? "Use the provided image as the main reference. Preserve the useful composition, food placement, table angle, and restaurant mood, but upgrade it into a cleaner high-quality thumbnail background."
     : "Create a new high-quality thumbnail background from the description.";
   return `
+Create 4 distinct recommendation candidates with different framing, brightness, and food emphasis while keeping all candidates usable as a blog thumbnail background.
 ${referenceRule}
 Subject: ${input.place || input.topic || "Indonesian restaurant"} in Jakarta/Kokas style.
 Food on table: ${menus}.
-Style: premium Korean blog / YouTube thumbnail background, semi-illustrated but still food-photography based, crisp details, glossy appetizing food, warmer colors, slightly cartoon-like outlines, cinematic restaurant lighting, polished and high-resolution.
+Style: premium Korean blog / YouTube thumbnail background, semi-illustrated but still food-photography based, crisp details, glossy appetizing food, warm but bright colors, slightly cartoon-like outlines, cinematic restaurant lighting, polished and high-resolution.
 Mood: warm Indonesian restaurant interior, cozy lighting, wooden table, teal or green tiles if suitable, soft background blur, appetizing grilled prawns and satay skewers, rice basket, sambal sauce, jahe madu tea.
-Composition: leave the left 42 percent darker and cleaner for large title text. Keep food in the lower center and right side. Keep the restaurant atmosphere visible in the back. Avoid making the whole image too dark.
+Composition: leave the left 42 percent clean for large title text, but do not make it black or heavily dark. Keep food in the lower center and right side. Keep the restaurant atmosphere visible in the back. Overall brightness should feel warm, appetizing, and clear.
 Style note from user: ${extraStyle || "high-quality semi-cartoon restaurant thumbnail, polished but natural"}
 Important: remove or ignore any existing letters, Korean/English/Indonesian words, red check marks, icons, UI buttons, watermark, logo, sign text, people faces, hands, menu text, or browser screenshot artifacts from the reference image. The app will add all title text later.
 `.trim();
@@ -3246,14 +3289,14 @@ function drawGeneratedThumbnailScene(ctx, canvas, img) {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
   ctx.save();
-  ctx.filter = "saturate(1.08) contrast(1.04) brightness(0.94)";
+  ctx.filter = "saturate(1.1) contrast(1.03) brightness(1.06)";
   coverImageIn(ctx, img, 0, 0, w, h);
   ctx.restore();
 
   const warmth = ctx.createLinearGradient(0, 0, 0, h);
-  warmth.addColorStop(0, "rgba(35,22,12,0.04)");
-  warmth.addColorStop(0.62, "rgba(64,35,18,0.08)");
-  warmth.addColorStop(1, "rgba(34,18,10,0.22)");
+  warmth.addColorStop(0, "rgba(255,232,188,0.03)");
+  warmth.addColorStop(0.62, "rgba(255,200,118,0.04)");
+  warmth.addColorStop(1, "rgba(52,28,14,0.08)");
   ctx.fillStyle = warmth;
   ctx.fillRect(0, 0, w, h);
 }
@@ -3311,7 +3354,7 @@ function drawThumbnailPhotoScene(ctx, canvas, loaded) {
   ctx.clearRect(0, 0, w, h);
   if (background) {
     ctx.save();
-    ctx.filter = "blur(5px) saturate(1.12) brightness(0.72)";
+    ctx.filter = "blur(4px) saturate(1.12) brightness(0.92)";
     coverImageIn(ctx, background, -22, -22, w + 44, h + 44);
     ctx.restore();
   } else {
@@ -3319,9 +3362,9 @@ function drawThumbnailPhotoScene(ctx, canvas, loaded) {
   }
 
   const warm = ctx.createLinearGradient(0, 0, 0, h);
-  warm.addColorStop(0, "rgba(55,34,18,0.12)");
-  warm.addColorStop(0.48, "rgba(92,53,24,0.2)");
-  warm.addColorStop(1, "rgba(45,25,13,0.58)");
+  warm.addColorStop(0, "rgba(255,226,175,0.03)");
+  warm.addColorStop(0.48, "rgba(120,70,28,0.08)");
+  warm.addColorStop(1, "rgba(45,25,13,0.2)");
   ctx.fillStyle = warm;
   ctx.fillRect(0, 0, w, h);
   drawThumbnailTable(ctx, w, h);
@@ -3417,25 +3460,25 @@ function drawPlate(ctx, x, y, w, h, fill) {
 function drawThumbnailOverlay(ctx, canvas, input, accent) {
   const w = canvas.width;
   const h = canvas.height;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
   ctx.fillRect(0, 0, w, h);
 
   const leftFade = ctx.createLinearGradient(0, 0, w * 0.72, 0);
-  leftFade.addColorStop(0, "rgba(0,0,0,0.44)");
-  leftFade.addColorStop(0.54, "rgba(0,0,0,0.18)");
+  leftFade.addColorStop(0, "rgba(0,0,0,0.28)");
+  leftFade.addColorStop(0.5, "rgba(0,0,0,0.08)");
   leftFade.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = leftFade;
   ctx.fillRect(0, 0, w, h);
 
   const bottomFade = ctx.createLinearGradient(0, h * 0.48, 0, h);
   bottomFade.addColorStop(0, "rgba(0,0,0,0)");
-  bottomFade.addColorStop(1, "rgba(0,0,0,0.42)");
+  bottomFade.addColorStop(1, "rgba(0,0,0,0.18)");
   ctx.fillStyle = bottomFade;
   ctx.fillRect(0, 0, w, h);
 
   const radial = ctx.createRadialGradient(w * 0.66, h * 0.5, 110, w * 0.66, h * 0.5, 760);
   radial.addColorStop(0, "rgba(0,0,0,0)");
-  radial.addColorStop(1, "rgba(0,0,0,0.22)");
+  radial.addColorStop(1, "rgba(0,0,0,0.08)");
   ctx.fillStyle = radial;
   ctx.fillRect(0, 0, w, h);
 
@@ -3654,6 +3697,9 @@ function resetInputs() {
   if (!confirm("입력과 결과를 초기화할까요?")) return;
   state.photos = [];
   state.aiThumbnailDataUrl = "";
+  state.thumbnailCandidates = [];
+  state.selectedThumbnailCandidate = -1;
+  renderThumbnailCandidates();
   renderPhotos();
   generateAll();
 }

@@ -851,6 +851,44 @@ textarea {
   width: 100%;
 }
 
+.thumbnail-candidate-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.thumbnail-candidate {
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #435147;
+  text-align: left;
+}
+
+.thumbnail-candidate img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 5px;
+  background: #eee7dc;
+}
+
+.thumbnail-candidate span {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.thumbnail-candidate.is-selected {
+  border-color: #2f503c;
+  background: #edf4ee;
+  box-shadow: 0 0 0 2px rgba(47, 80, 60, 0.12);
+}
+
 .primary-btn.is-busy,
 .secondary-btn.is-busy {
   border-color: #c8ad67;

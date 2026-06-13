@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260614-thumbnail-reference-edit">
+  <link rel="stylesheet" href="styles.css?v=20260614-thumbnail-candidates">
 </head>
 <body>
   <main class="app-shell">
@@ -213,13 +213,14 @@ Casa Residence에서 가까워서 들르기 편함
             </label>
             <label class="stacked">
               <span>AI 썸네일 사진 느낌</span>
-              <textarea id="thumbnailPromptInput" rows="5">내가 올린 사진의 구도와 음식 느낌은 살리고, 더 선명한 고퀄 반만화 썸네일 느낌으로. 음식은 윤기 있게, 배경은 따뜻하게, 왼쪽은 제목을 올릴 수 있게 어둡고 여백 있게</textarea>
+              <textarea id="thumbnailPromptInput" rows="5">내가 올린 사진의 구도와 음식 느낌은 살리고, 더 선명한 고퀄 반만화 썸네일 느낌으로. 음식은 윤기 있게, 배경은 따뜻하고 밝게, 왼쪽은 제목이 읽힐 정도만 정리</textarea>
             </label>
             <div class="thumbnail-action-row">
-              <button id="generateAiThumbBtn" class="primary-btn" type="button">AI 썸네일 고퀄 변환</button>
+              <button id="generateAiThumbBtn" class="primary-btn" type="button">추천 썸네일 4개 만들기</button>
               <button id="clearAiThumbBtn" class="secondary-btn" type="button">AI 사진 지우기</button>
             </div>
-            <p id="thumbnailAiStatus" class="metric-row">업로드한 사진을 기준으로 고퀄 썸네일 사진처럼 변환해요. 사진이 없을 때만 새로 생성해요.</p>
+            <p id="thumbnailAiStatus" class="metric-row">업로드한 사진을 기준으로 밝은 고퀄 썸네일 후보 4개를 만들고, 마음에 드는 걸 선택해요.</p>
+            <div id="thumbnailCandidateList" class="thumbnail-candidate-list" aria-label="추천 썸네일 후보"></div>
             <button id="renderThumbBtn" class="secondary-btn" type="button">썸네일 다시 그리기</button>
             <button id="downloadThumbBtn" class="primary-btn" type="button">썸네일 저장</button>
           </div>
@@ -268,6 +269,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260614-thumbnail-reference-edit"></script>
+  <script src="app.js?v=20260614-thumbnail-candidates"></script>
 </body>
 </html>
