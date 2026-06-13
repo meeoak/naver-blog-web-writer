@@ -2249,9 +2249,10 @@ function renderPreviewPhoto(photo, caption, note, photoNumber = 0) {
   const safeNote = String(note || "").trim();
   const altText = safeCaption || `${getInput().place || getInput().topic || "블로그"} 사진`;
   const controls = photoNumber ? `
-    <div class="photo-move-controls" aria-label="사진 위치 이동" contenteditable="false">
+    <div class="photo-move-controls" aria-label="사진 위치와 삭제" contenteditable="false">
       <button type="button" data-photo-move="up" data-photo-number="${photoNumber}">위로</button>
       <button type="button" data-photo-move="down" data-photo-number="${photoNumber}">아래로</button>
+      <button class="is-danger" type="button" data-photo-delete="true" data-photo-number="${photoNumber}">삭제</button>
     </div>
   ` : "";
   if (!photo?.dataUrl) {
@@ -2275,19 +2276,28 @@ function renderPreviewPhoto(photo, caption, note, photoNumber = 0) {
 }
 
 function handlePreviewPhotoMove(event) {
-  const button = event.target.closest("[data-photo-move]");
+  const button = event.target.closest("[data-photo-move], [data-photo-delete]");
   if (!button) return;
   const photoNumber = Number(button.dataset.photoNumber);
-  const direction = button.dataset.photoMove;
-  if (!photoNumber || !direction) return;
+  if (!photoNumber) return;
   syncPreviewEditsIfNeeded({ silent: true });
+  if (button.dataset.photoDelete) {
+    deletePhotoBlock(photoNumber);
+    return;
+  }
+  const direction = button.dataset.photoMove;
+  if (!direction) return;
   movePhotoBlock(photoNumber, direction);
+}
+
+function photoBlockStart(lines, photoNumber) {
+  return lines.findIndex((line) => new RegExp(`^\\[사진\\s+${photoNumber}(?::.*)?\\]$`).test(line.trim()));
 }
 
 function movePhotoBlock(photoNumber, direction) {
   const editor = $("postEditor");
   const lines = editor.value.split(/\r?\n/);
-  const start = lines.findIndex((line) => new RegExp(`^\\[사진\\s+${photoNumber}(?::.*)?\\]$`).test(line.trim()));
+  const start = photoBlockStart(lines, photoNumber);
   if (start < 0) return;
   const end = photoBlockEnd(lines, start);
   const photoBlock = lines.slice(start, end);
@@ -2317,6 +2327,20 @@ function movePhotoBlock(photoNumber, direction) {
   }
 
   refreshReports();
+}
+
+function deletePhotoBlock(photoNumber) {
+  const editor = $("postEditor");
+  const lines = editor.value.split(/\r?\n/);
+  const start = photoBlockStart(lines, photoNumber);
+  if (start < 0) return;
+  const end = photoBlockEnd(lines, start);
+  editor.value = [
+    ...lines.slice(0, start),
+    ...lines.slice(end),
+  ].join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  refreshReports();
+  setAiStatus("사진과 바로 아래 사진 설명을 원고에서 삭제했어.");
 }
 
 function photoBlockEnd(lines, start) {
@@ -2490,7 +2514,7 @@ function renderPhotoPlanReport() {
   const { selected, skipped } = selectedPhotoPlan(input);
   $("photoPlanReport").innerHTML = selected.length
     ? [
-      `<p class="metric-row status-good">원고에 넣을 대표 사진 ${selected.length}장${skipped.length ? `, 중복/보조 사진 ${skipped.length}장 제외` : ""}</p>`,
+      `<p class="metric-row status-good">원고에 넣을 사진 ${selected.length}장${skipped.length ? `, 제외된 사진 ${skipped.length}장` : ""}</p>`,
       `<p class="metric-row">사진은 기본적으로 설명 없이 배치해요. 직접 쓴 사진 메모가 있을 때만 캡션/문장을 반영해요.</p>`,
       `<ul class="report-list">${selected.map((photo) => `<li>사용: 사진 ${photo.index} / ${escapeHtml(photoRoleLabel(photo.role))}<br>${escapeHtml(manualPhotoNote(photo) || "자동 설명 없음")}</li>`).join("")}</ul>`,
       skipped.length ? `<ul class="report-list">${skipped.map((photo) => `<li>제외: 사진 ${photo.index}<br>${escapeHtml(photo.skipReason)}</li>`).join("")}</ul>` : "",
@@ -2903,6 +2927,7 @@ function appendFigureText(figure, lines) {
 function cleanPreviewText(text) {
   return String(text || "")
     .replace(/\s+/g, " ")
+    .replace(/위로\s*아래로\s*삭제/g, "")
     .replace(/위로\s*아래로/g, "")
     .trim();
 }
@@ -3192,7 +3217,7 @@ async function copyStyledPost() {
   cleanPreview.classList.remove("is-editing");
   applyInlinePostStyles(cleanPreview);
   const html = `
-    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.82;">
+    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
       ${cleanPreview.innerHTML}
     </article>
   `;
@@ -3222,7 +3247,7 @@ function applyInlinePostStyles(root) {
     element.setAttribute("style", "margin:28px 0 12px;color:#253f34;font-size:19px;line-height:1.42;font-weight:750;letter-spacing:0;");
   });
   root.querySelectorAll("p").forEach((element) => {
-    const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.82;letter-spacing:0;";
+    const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.84;letter-spacing:0;";
     const toneColor = inlineParagraphToneColor(element);
     const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
@@ -3234,10 +3259,10 @@ function applyInlinePostStyles(root) {
     }
   });
   root.querySelectorAll("ul").forEach((element) => {
-    element.setAttribute("style", "margin:4px 0 22px;padding:13px 18px 13px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.82;");
+    element.setAttribute("style", "margin:4px 0 22px;padding:13px 18px 13px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.84;");
   });
   root.querySelectorAll("li").forEach((element) => {
-    element.setAttribute("style", "margin:4px 0;line-height:1.82;");
+    element.setAttribute("style", "margin:4px 0;line-height:1.84;");
   });
   root.querySelectorAll(".preview-keyword").forEach((element) => {
     element.setAttribute("style", "color:#17483b;font-weight:800;");
@@ -3246,7 +3271,7 @@ function applyInlinePostStyles(root) {
     element.setAttribute("style", "padding:0 .14em;background:linear-gradient(transparent 58%, #fff0bd 58%);box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:2px;");
   });
   root.querySelectorAll("figcaption").forEach((element) => {
-    element.setAttribute("style", "margin:0 auto;padding:10px 4px 0;color:#5f665f;font-size:14px;line-height:1.58;text-align:center;");
+    element.setAttribute("style", "margin:0 auto;padding:10px 4px 0;color:#5f665f;font-size:14px;line-height:1.7;text-align:center;");
   });
   root.querySelectorAll("img").forEach((element) => {
     element.setAttribute("style", "display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px;");
