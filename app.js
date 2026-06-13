@@ -3228,24 +3228,25 @@ async function exportToGoogleDocs() {
     button.classList.add("is-busy");
     button.textContent = "복사 중";
   }
-  const { html, plain } = buildPostExportHtml();
+  const { html, plain, title } = buildPostExportHtml();
+  const docsUrl = `https://docs.google.com/document/create?title=${encodeURIComponent(title)}`;
   try {
-    setAiStatus("구글문서용으로 사진 포함 원고를 먼저 복사하는 중이야.");
+    setAiStatus(`구글문서용으로 사진 포함 원고를 먼저 복사하는 중이야. 문서 제목은 "${title}"로 열게.`);
     const copiedRich = await copyRichHtml(html, plain);
     if (!copiedRich) {
-      downloadGoogleDocsHtml(html);
-      setAiStatus("브라우저가 사진 포함 복사를 지원하지 않아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
+      downloadGoogleDocsHtml(html, title);
+      setAiStatus(`브라우저가 사진 포함 복사를 지원하지 않아서 "${safeFilename(title)}.html" 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.`, true);
       return;
     }
     if (button) button.textContent = "복사 완료";
-    const docsWindow = window.open("https://docs.new", "_blank", "noopener");
+    const docsWindow = window.open(docsUrl, "_blank", "noopener");
     const openGuide = docsWindow
-      ? "새로 열린 빈 문서에서 Ctrl+V를 눌러 붙여넣어줘."
-      : "팝업이 막혔으면 docs.new를 직접 열고 Ctrl+V를 눌러 붙여넣어줘.";
-    setAiStatus(`구글문서용 복사 완료. ${openGuide} Google Docs에는 보안상 자동 붙여넣기는 안 돼.`);
+      ? "새로 열린 Google Docs 문서 제목은 블로그 제목으로 들어가고, 본문은 Ctrl+V로 붙여넣어줘."
+      : "팝업이 막혔으면 구글문서 복사+열기를 한 번 더 누르거나 Google Docs에서 새 문서를 열고 Ctrl+V를 눌러줘.";
+    setAiStatus(`구글문서용 복사 완료. ${openGuide} Google Docs에는 보안상 본문 자동 붙여넣기는 안 돼.`);
   } catch (error) {
-    downloadGoogleDocsHtml(html);
-    setAiStatus("브라우저가 사진 포함 복사를 막아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
+    downloadGoogleDocsHtml(html, title);
+    setAiStatus(`브라우저가 사진 포함 복사를 막아서 "${safeFilename(title)}.html" 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.`, true);
   } finally {
     if (button) {
       button.disabled = false;
@@ -3273,7 +3274,8 @@ function buildPostExportHtml() {
     </article>
   `;
   const plain = $("postEditor").value;
-  return { html, plain };
+  const title = postTitleForExport(plain);
+  return { html, plain, title };
 }
 
 async function copyRichHtml(html, plain) {
@@ -3291,18 +3293,31 @@ async function copyRichHtml(html, plain) {
   return true;
 }
 
-function downloadGoogleDocsHtml(html) {
+function postTitleForExport(text) {
+  const firstLine = String(text || "").split(/\r?\n/).map((line) => line.trim()).find(Boolean);
+  return (firstLine || $("topicInput")?.value?.trim() || "네이버 블로그 원고").slice(0, 110);
+}
+
+function safeFilename(text) {
+  return String(text || "네이버 블로그 원고")
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 90) || "네이버 블로그 원고";
+}
+
+function downloadGoogleDocsHtml(html, title = "네이버 블로그 원고") {
   const documentHtml = `<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>네이버 블로그 원고</title>
+  <title>${escapeHtml(title)}</title>
 </head>
 <body>
 ${html}
 </body>
 </html>`;
-  downloadBlob("google-docs-post.html", new Blob([documentHtml], { type: "text/html;charset=utf-8" }));
+  downloadBlob(`${safeFilename(title)}.html`, new Blob([documentHtml], { type: "text/html;charset=utf-8" }));
 }
 
 function applyInlinePostStyles(root) {
