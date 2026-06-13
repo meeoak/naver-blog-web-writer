@@ -160,6 +160,7 @@ function handlePhotos(event) {
         caption: autoCaption(file.name, state.photos.length),
         note: "",
         role: autoRole(file.name, state.photos.length),
+        size: "auto",
         autoMatched: false,
         userEdited: false,
       };
@@ -394,7 +395,12 @@ function renderPhotos() {
             ${roleOptions(photo.role)}
           </select>
         </div>
-        <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="이 사진에 대한 경험 메모">
+        <div class="mini-grid">
+          <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="이 사진에 대한 경험 메모">
+          <select data-photo-field="size" aria-label="사진 크기">
+            ${sizeOptions(photo.size)}
+          </select>
+        </div>
       </div>
     </div>
   `).join("");
@@ -403,6 +409,11 @@ function renderPhotos() {
     const handlePhotoFieldChange = () => {
       const item = field.closest(".photo-item");
       const photo = state.photos.find((entry) => entry.id === item.dataset.id);
+      if (field.dataset.photoField === "size") {
+        photo.size = field.value;
+        refreshReports();
+        return;
+      }
       photo.userEdited = true;
       photo.autoMatched = false;
       photo[field.dataset.photoField] = field.value;
@@ -426,6 +437,17 @@ function roleOptions(current) {
     ["body", "기타"],
   ];
   return roles.map(([value, label]) => `<option value="${value}" ${value === current ? "selected" : ""}>${label}</option>`).join("");
+}
+
+function sizeOptions(current = "auto") {
+  const sizes = [
+    ["auto", "자동 크기"],
+    ["small", "작게"],
+    ["medium", "보통"],
+    ["large", "크게"],
+    ["full", "가득"],
+  ];
+  return sizes.map(([value, label]) => `<option value="${value}" ${value === (current || "auto") ? "selected" : ""}>${label}</option>`).join("");
 }
 
 function generateAll() {
@@ -1387,7 +1409,10 @@ function previewPhotoClass(photo) {
   const classes = ["preview-photo"];
   if (!photo?.dataUrl) classes.push("is-missing");
   const role = photo?.role || "body";
-  if (["thumbnail", "exterior", "interior", "body"].includes(role)) {
+  const size = photo?.size || "auto";
+  if (size !== "auto") {
+    classes.push(`is-size-${size}`);
+  } else if (["thumbnail", "exterior", "interior", "body"].includes(role)) {
     classes.push("is-wide");
   } else if (["drink", "menu", "map"].includes(role)) {
     classes.push("is-compact");
