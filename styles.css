@@ -837,6 +837,27 @@ textarea {
   background: #fff;
 }
 
+.thumbnail-controls textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.thumbnail-action-row {
+  display: grid;
+  gap: 8px;
+}
+
+.thumbnail-action-row button {
+  width: 100%;
+}
+
+.primary-btn.is-busy,
+.secondary-btn.is-busy {
+  border-color: #c8ad67;
+  background: #fbf8f1;
+  color: #71561d;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -10,6 +10,8 @@ const state = {
   aiSearchSources: [],
   voicePresets: loadVoicePresets(),
   isPolished: false,
+  thumbnailRenderId: 0,
+  aiThumbnailDataUrl: "",
 };
 
 const aiSmells = [
@@ -55,6 +57,7 @@ const adRules = [
 
 document.addEventListener("DOMContentLoaded", () => {
   loadOpenAISettings();
+  loadThumbnailSettings();
   loadVoiceSettings();
   bindEvents();
   renderVoicePresets();
@@ -80,6 +83,8 @@ function bindEvents() {
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
   $("downloadThumbBtn").addEventListener("click", downloadThumbnail);
+  $("generateAiThumbBtn").addEventListener("click", generateAIThumbnailImage);
+  $("clearAiThumbBtn").addEventListener("click", clearAIThumbnailImage);
   $("copyPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
     copyText($("postEditor").value);
@@ -109,6 +114,9 @@ function bindEvents() {
   $("accentInput").addEventListener("input", drawThumbnail);
   $("thumbTitleInput").addEventListener("input", drawThumbnail);
   $("thumbRibbonInput").addEventListener("input", drawThumbnail);
+  ["thumbnailImageModelInput", "thumbnailPromptInput"].forEach((id) => {
+    $(id).addEventListener("input", saveThumbnailSettings);
+  });
 
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => activateTab(tab.dataset.tab));
@@ -136,12 +144,24 @@ function loadOpenAISettings() {
   }
 }
 
+function loadThumbnailSettings() {
+  const imageModel = localStorage.getItem("naverBlogThumbnailImageModel") || "";
+  const prompt = localStorage.getItem("naverBlogThumbnailPrompt") || "";
+  if (imageModel && $("thumbnailImageModelInput")) $("thumbnailImageModelInput").value = imageModel;
+  if (prompt && $("thumbnailPromptInput")) $("thumbnailPromptInput").value = prompt;
+}
+
 function saveOpenAISettings() {
   const key = normalizeOpenAIKey($("openaiKeyInput").value);
   if (key) localStorage.setItem("naverBlogOpenAIKey", key);
   else localStorage.removeItem("naverBlogOpenAIKey");
   localStorage.setItem("naverBlogOpenAIModel", $("aiModelInput").value.trim() || "gpt-5.5");
   localStorage.setItem("naverBlogOpenAIInstruction", $("aiInstructionInput").value.trim());
+}
+
+function saveThumbnailSettings() {
+  localStorage.setItem("naverBlogThumbnailImageModel", $("thumbnailImageModelInput").value.trim() || "gpt-image-1");
+  localStorage.setItem("naverBlogThumbnailPrompt", $("thumbnailPromptInput").value.trim());
 }
 
 function clearOpenAIKey() {
@@ -181,7 +201,7 @@ function getInput() {
     keywordsGoogle: splitList($("keywordGoogleInput").value),
     thumbTitle: $("thumbTitleInput").value.trim(),
     thumbRibbon: $("thumbRibbonInput").value.trim(),
-    brand: $("brandInput").value.trim() || "Ara in Indonesia",
+    brand: $("brandInput").value.trim() || "Ara Cinta Indonesia",
     voice: $("voiceInput").value.trim(),
     photoDensity: $("photoDensityInput").value || "all",
     photoCaptionMode: $("photoCaptionModeInput").value || "safe",
@@ -687,6 +707,9 @@ function friendlyOpenAIError(message) {
   if (/model.*not.*found|does not exist|not have access/i.test(text)) {
     return "현재 계정에서 이 모델을 사용할 수 없어요. 모델명을 계정에서 사용 가능한 모델로 바꿔줘.";
   }
+  if (/quota|billing|insufficient/i.test(text)) {
+    return "API 사용량이나 결제 설정을 확인해야 해. OpenAI 사용량/결제 상태를 보고 다시 시도해줘.";
+  }
   return text;
 }
 
@@ -697,6 +720,110 @@ function setAiStatus(message, isError = false) {
   status.classList.toggle("status-warn", Boolean(isError));
   status.classList.toggle("status-good", !isError && /완료|저장|성공/.test(message));
   status.classList.toggle("status-working", !isError && /중|진행|정리하고/.test(message));
+}
+
+function setThumbnailAiStatus(message, isError = false) {
+  const status = $("thumbnailAiStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("status-warn", Boolean(isError));
+  status.classList.toggle("status-good", !isError && /완료|저장|성공|적용/.test(message));
+  status.classList.toggle("status-working", !isError && /중|생성|준비/.test(message));
+}
+
+async function generateAIThumbnailImage() {
+  const apiKey = normalizeOpenAIKey($("openaiKeyInput").value);
+  const model = $("thumbnailImageModelInput").value.trim() || "gpt-image-1";
+  if (!apiKey) {
+    setThumbnailAiStatus("OpenAI API 키를 먼저 넣어줘. 기존 OpenAI 자동 작성 칸의 키를 같이 써.", true);
+    return;
+  }
+  if (!isOpenAIKeyLike(apiKey)) {
+    setThumbnailAiStatus("API 키 형식이 맞지 않아. sk- 또는 sk-proj-로 시작하는 키를 넣어줘.", true);
+    return;
+  }
+
+  saveOpenAISettings();
+  saveThumbnailSettings();
+  const button = $("generateAiThumbBtn");
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.classList.add("is-busy");
+  button.textContent = "사진 생성 중";
+  setThumbnailAiStatus("참고 이미지처럼 따뜻한 식당 썸네일용 연출 사진을 만드는 중이야. 보통 20~60초 정도 걸릴 수 있어.");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        prompt: buildThumbnailImagePrompt(getInput()),
+        size: "1536x1024",
+        quality: "medium",
+        n: 1,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data?.error?.message || `AI 썸네일 사진 생성 실패 (${response.status})`;
+      throw new Error(message);
+    }
+    const imageItem = data?.data?.[0];
+    const dataUrl = await imageResultToDataUrl(imageItem);
+    if (!dataUrl) throw new Error("생성된 이미지를 읽지 못했어.");
+    state.aiThumbnailDataUrl = dataUrl;
+    drawThumbnail();
+    setThumbnailAiStatus("AI 썸네일 사진 생성 완료. 참고 이미지처럼 연출 사진 배경을 깔고 글자를 다시 얹었어.");
+  } catch (error) {
+    setThumbnailAiStatus(`AI 썸네일 사진 생성 실패: ${friendlyOpenAIError(error.message)}`, true);
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-busy");
+    button.textContent = originalLabel;
+  }
+}
+
+function clearAIThumbnailImage() {
+  state.aiThumbnailDataUrl = "";
+  drawThumbnail();
+  setThumbnailAiStatus("AI 사진을 지우고 업로드 사진 조합 방식으로 돌아갔어.");
+}
+
+function buildThumbnailImagePrompt(input) {
+  const menus = input.menus.map((menu) => `${menu.name}${menu.local ? ` (${menu.local})` : ""}`).join(", ") || "Indonesian food";
+  const extraStyle = $("thumbnailPromptInput").value.trim();
+  return `
+Create one photorealistic 16:9 blog thumbnail background image.
+Subject: ${input.place || input.topic || "Indonesian restaurant"} in Jakarta/Kokas style.
+Food on table: ${menus}.
+Mood: warm Indonesian restaurant interior, cozy lighting, wooden table, teal or green tiles, soft background blur, appetizing grilled prawns and satay skewers in the foreground, rice basket, sambal sauce, jahe madu tea.
+Composition: leave the left 42 percent darker and cleaner for large title text. Put the most appetizing food in the lower center and right side. Keep the restaurant atmosphere visible in the back.
+Style note from user: ${extraStyle || "warm restaurant food thumbnail, polished but natural"}
+Important: do not put any letters, words, logo, watermark, sign text, people faces, hands, menu text, or brand marks in the image. The app will add all title text later.
+`.trim();
+}
+
+async function imageResultToDataUrl(item) {
+  if (!item) return "";
+  if (item.b64_json) return `data:image/png;base64,${item.b64_json}`;
+  if (!item.url) return "";
+  const imageResponse = await fetch(item.url);
+  if (!imageResponse.ok) return "";
+  const blob = await imageResponse.blob();
+  return blobToDataUrl(blob);
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("이미지를 변환하지 못했어."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function prepareOpenAIPhotos(input) {
@@ -3005,26 +3132,173 @@ function drawThumbnail() {
   const canvas = $("thumbnailCanvas");
   const ctx = canvas.getContext("2d");
   const input = getInput();
-  const photo = state.photos.find((item) => item.role === "thumbnail") || state.photos[0];
   const accent = $("accentInput").value || "#d86b79";
-  if (photo) {
-    const img = new Image();
-    img.onload = () => {
-      coverImage(ctx, img, canvas.width, canvas.height);
-      drawThumbnailOverlay(ctx, canvas, input, accent);
-    };
-    img.src = photo.dataUrl;
-  } else {
+  const renderId = state.thumbnailRenderId + 1;
+  state.thumbnailRenderId = renderId;
+
+  if (state.aiThumbnailDataUrl) {
+    loadCanvasImage(state.aiThumbnailDataUrl)
+      .then((img) => {
+        if (state.thumbnailRenderId !== renderId) return;
+        drawGeneratedThumbnailScene(ctx, canvas, img);
+        drawThumbnailOverlay(ctx, canvas, input, accent);
+      })
+      .catch(() => {
+        if (state.thumbnailRenderId !== renderId) return;
+        state.aiThumbnailDataUrl = "";
+        drawFallbackBackground(ctx, canvas);
+        drawThumbnailOverlay(ctx, canvas, input, accent);
+        setThumbnailAiStatus("AI 썸네일 사진을 읽지 못해서 업로드 사진 조합으로 돌아갔어.", true);
+      });
+    return;
+  }
+
+  const scenePhotos = thumbnailScenePhotos();
+
+  if (!scenePhotos.length) {
     drawFallbackBackground(ctx, canvas);
     drawThumbnailOverlay(ctx, canvas, input, accent);
+    return;
   }
+
+  Promise.all(scenePhotos.map((photo) => loadCanvasImage(photo.dataUrl).then((img) => ({ photo, img })).catch(() => null)))
+    .then((loadedItems) => {
+      if (state.thumbnailRenderId !== renderId) return;
+      const loaded = loadedItems.filter(Boolean);
+      if (!loaded.length) {
+        drawFallbackBackground(ctx, canvas);
+      } else {
+        drawThumbnailPhotoScene(ctx, canvas, loaded);
+      }
+      drawThumbnailOverlay(ctx, canvas, input, accent);
+  });
+}
+
+function drawGeneratedThumbnailScene(ctx, canvas, img) {
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.filter = "saturate(1.08) contrast(1.04) brightness(0.94)";
+  coverImageIn(ctx, img, 0, 0, w, h);
+  ctx.restore();
+
+  const warmth = ctx.createLinearGradient(0, 0, 0, h);
+  warmth.addColorStop(0, "rgba(35,22,12,0.04)");
+  warmth.addColorStop(0.62, "rgba(64,35,18,0.08)");
+  warmth.addColorStop(1, "rgba(34,18,10,0.22)");
+  ctx.fillStyle = warmth;
+  ctx.fillRect(0, 0, w, h);
 }
 
 function coverImage(ctx, img, width, height) {
+  coverImageIn(ctx, img, 0, 0, width, height);
+}
+
+function coverImageIn(ctx, img, x, y, width, height) {
   const ratio = Math.max(width / img.width, height / img.height);
   const drawWidth = img.width * ratio;
   const drawHeight = img.height * ratio;
-  ctx.drawImage(img, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  ctx.drawImage(img, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+function loadCanvasImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function thumbnailScenePhotos() {
+  const photos = state.photos.filter((photo) => photo.dataUrl);
+  if (!photos.length) return [];
+  const background = photos.find((photo) => ["thumbnail", "interior", "exterior", "body"].includes(photo.role) && photo.analysis?.visualRole !== "food")
+    || photos.find((photo) => photo.role === "thumbnail")
+    || photos[0];
+  const foodPhotos = photos
+    .filter((photo) => photo.id !== background.id)
+    .filter((photo) => ["food", "drink", "menu"].includes(photo.role) || photo.analysis?.visualRole === "food" || Boolean(photo.analysis?.visualMenu))
+    .slice(0, 2);
+  const backupFood = photos.filter((photo) => photo.id !== background.id && !foodPhotos.some((item) => item.id === photo.id)).slice(0, Math.max(0, 2 - foodPhotos.length));
+  return uniqueById([background, ...foodPhotos, ...backupFood]).slice(0, 3);
+}
+
+function uniqueById(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = item?.id || item?.name;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function drawThumbnailPhotoScene(ctx, canvas, loaded) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const background = loaded[0]?.img;
+  ctx.clearRect(0, 0, w, h);
+  if (background) {
+    ctx.save();
+    ctx.filter = "blur(5px) saturate(1.12) brightness(0.72)";
+    coverImageIn(ctx, background, -22, -22, w + 44, h + 44);
+    ctx.restore();
+  } else {
+    drawFallbackBackground(ctx, canvas);
+  }
+
+  const warm = ctx.createLinearGradient(0, 0, 0, h);
+  warm.addColorStop(0, "rgba(55,34,18,0.12)");
+  warm.addColorStop(0.48, "rgba(92,53,24,0.2)");
+  warm.addColorStop(1, "rgba(45,25,13,0.58)");
+  ctx.fillStyle = warm;
+  ctx.fillRect(0, 0, w, h);
+  drawThumbnailTable(ctx, w, h);
+
+  const foodImages = loaded.slice(1).map((item) => item.img);
+  if (foodImages[1]) drawThumbnailFoodPhoto(ctx, foodImages[1], 870, 278, 340, 238, 26, -0.02);
+  if (foodImages[0]) {
+    drawThumbnailFoodPhoto(ctx, foodImages[0], 388, 410, 690, 276, 30, 0.01);
+  } else if (background) {
+    drawThumbnailFoodPhoto(ctx, background, 428, 414, 640, 268, 30, 0.01);
+  }
+}
+
+function drawThumbnailTable(ctx, w, h) {
+  const table = ctx.createLinearGradient(0, h * 0.58, 0, h);
+  table.addColorStop(0, "rgba(128,76,38,0.34)");
+  table.addColorStop(1, "rgba(75,40,20,0.82)");
+  ctx.fillStyle = table;
+  ctx.fillRect(0, h * 0.58, w, h * 0.42);
+  ctx.fillStyle = "rgba(255,226,170,0.15)";
+  ctx.fillRect(0, h * 0.59, w, 3);
+}
+
+function drawThumbnailFoodPhoto(ctx, img, x, y, width, height, radius, rotation = 0) {
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate(rotation);
+  ctx.shadowColor = "rgba(0,0,0,0.42)";
+  ctx.shadowBlur = 26;
+  ctx.shadowOffsetY = 16;
+  roundRect(ctx, -width / 2, -height / 2, width, height, radius, "rgba(255,246,226,0.88)", true);
+  ctx.shadowColor = "transparent";
+  roundedRectPath(ctx, -width / 2 + 10, -height / 2 + 10, width - 20, height - 20, Math.max(10, radius - 8));
+  ctx.clip();
+  coverImageIn(ctx, img, -width / 2 + 10, -height / 2 + 10, width - 20, height - 20);
+  ctx.restore();
+}
+
+function roundedRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawFallbackBackground(ctx, canvas) {
@@ -3074,32 +3348,35 @@ function drawPlate(ctx, x, y, w, h, fill) {
 function drawThumbnailOverlay(ctx, canvas, input, accent) {
   const w = canvas.width;
   const h = canvas.height;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
   ctx.fillRect(0, 0, w, h);
 
-  const bottomFade = ctx.createLinearGradient(0, h * 0.38, 0, h);
+  const leftFade = ctx.createLinearGradient(0, 0, w * 0.72, 0);
+  leftFade.addColorStop(0, "rgba(0,0,0,0.44)");
+  leftFade.addColorStop(0.54, "rgba(0,0,0,0.18)");
+  leftFade.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = leftFade;
+  ctx.fillRect(0, 0, w, h);
+
+  const bottomFade = ctx.createLinearGradient(0, h * 0.48, 0, h);
   bottomFade.addColorStop(0, "rgba(0,0,0,0)");
-  bottomFade.addColorStop(0.56, "rgba(0,0,0,0.34)");
-  bottomFade.addColorStop(1, "rgba(0,0,0,0.74)");
+  bottomFade.addColorStop(1, "rgba(0,0,0,0.42)");
   ctx.fillStyle = bottomFade;
-  ctx.fillRect(0, 0, w, h);
-
-  const sideFade = ctx.createLinearGradient(0, 0, w * 0.7, 0);
-  sideFade.addColorStop(0, "rgba(0,0,0,0.38)");
-  sideFade.addColorStop(0.72, "rgba(0,0,0,0)");
-  ctx.fillStyle = sideFade;
   ctx.fillRect(0, 0, w, h);
 
   const radial = ctx.createRadialGradient(w * 0.66, h * 0.5, 110, w * 0.66, h * 0.5, 760);
   radial.addColorStop(0, "rgba(0,0,0,0)");
-  radial.addColorStop(1, "rgba(0,0,0,0.26)");
+  radial.addColorStop(1, "rgba(0,0,0,0.22)");
   ctx.fillStyle = radial;
   ctx.fillRect(0, 0, w, h);
 
-  drawBrandPill(ctx, input.brand || "Ara in Indonesia");
-  drawThumbnailSpeech(ctx, "맛있다", 86, h - 232);
-  drawThumbnailSubtitle(ctx, input.thumbRibbon || "내 기준 솔직 후기", w - 58, h - 214, accent);
-  drawMainThumbnailTitle(ctx, input.thumbTitle || shortPlace(input.place || input.topic), 58, h - 44, w - 112, accent);
+  drawBrandPill(ctx, input.brand || "Ara Cinta Indonesia");
+  const [top, bottom] = splitTitle(input.thumbTitle || shortPlace(input.place || input.topic));
+  drawShadowText(ctx, top, 56, 154, "76px Georgia", "#fff8ef", "#111");
+  if (bottom) {
+    drawShadowText(ctx, bottom, 56, 300, "138px Georgia", accent, "#111");
+  }
+  drawRibbon(ctx, input.thumbRibbon || "내 기준 솔직 후기", accent, bottom ? 482 : 354);
 }
 
 function drawThumbnailSubtitle(ctx, text, rightX, y, accent) {
@@ -3307,6 +3584,7 @@ function downloadThumbnail() {
 function resetInputs() {
   if (!confirm("입력과 결과를 초기화할까요?")) return;
   state.photos = [];
+  state.aiThumbnailDataUrl = "";
   renderPhotos();
   generateAll();
 }
