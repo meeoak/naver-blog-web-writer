@@ -53,6 +53,7 @@ const adRules = [
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   renderVoicePresets();
+  renderPhotos();
   generateAll();
 });
 
@@ -138,24 +139,47 @@ function parseMenus(text) {
 
 function handlePhotos(event) {
   const files = Array.from(event.target.files || []);
+  if (!files.length) {
+    updatePhotoStatus("선택된 사진이 없어요.");
+    return;
+  }
+
+  let loaded = 0;
+  updatePhotoStatus(`${files.length}장 불러오는 중...`);
   files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = () => {
       state.photos.push({
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        id: makeId(),
         name: file.name,
         dataUrl: reader.result,
         caption: autoCaption(file.name, state.photos.length),
         note: "",
         role: autoRole(file.name, state.photos.length),
       });
+      loaded += 1;
       renderPhotos();
       drawThumbnail();
       refreshReports();
+      updatePhotoStatus(`${loaded}장 추가됨. 필요하면 사진 설명과 역할을 바꿔줘.`);
+    };
+    reader.onerror = () => {
+      loaded += 1;
+      updatePhotoStatus(`${file.name} 파일을 읽지 못했어. JPG, PNG, WEBP 사진으로 다시 넣어봐.`);
     };
     reader.readAsDataURL(file);
   });
   event.target.value = "";
+}
+
+function makeId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+  return String(Date.now() + Math.random());
+}
+
+function updatePhotoStatus(message) {
+  const status = $("photoStatus");
+  if (status) status.textContent = message;
 }
 
 function autoCaption(filename, index) {
@@ -180,6 +204,7 @@ function renderPhotos() {
   const list = $("photoList");
   if (!state.photos.length) {
     list.innerHTML = `<p class="metric-row">사진을 넣으면 썸네일과 본문 배치에 반영돼요.</p>`;
+    updatePhotoStatus("아직 추가된 사진이 없어요.");
     return;
   }
   list.innerHTML = state.photos.map((photo) => `

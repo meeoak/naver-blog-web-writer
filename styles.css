@@ -151,6 +151,16 @@ textarea {
   margin-bottom: 12px;
 }
 
+.photo-picker {
+  margin: 10px 0;
+}
+
+.photo-picker input[type="file"] {
+  cursor: pointer;
+  border-style: dashed;
+  background: #fff;
+}
+
 .tool-surface {
   margin-top: 14px;
   padding: 14px;
