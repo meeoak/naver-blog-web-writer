@@ -572,21 +572,21 @@ function convertNaverPostToBlogspot(input, tags, naverPost) {
   const description = makeBlogspotSearchDescription(input);
   const labels = makeBlogspotLabels(input, tags);
   const slug = makeBlogspotSlug(input);
-  const body = naverToBlogspotHtml(naverPost, input);
+  const body = naverToBlogspotPlain(naverPost, input);
   return [
-    "TITLE",
+    "제목",
     title,
     "",
-    "SEARCH DESCRIPTION",
+    "검색 설명",
     description,
     "",
-    "PERMALINK",
+    "고유주소",
     slug,
     "",
-    "LABELS",
+    "라벨",
     labels.join(", "),
     "",
-    "BODY HTML",
+    "본문",
     body,
   ].join("\n");
 }
@@ -663,6 +663,24 @@ function naverToBlogspotHtml(naverPost, input) {
     ...convertLinesToHtml(bodyLines, input),
   ];
   return html.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function naverToBlogspotPlain(naverPost, input) {
+  const title = naverPost.split(/\r?\n/).find(Boolean) || makeBlogspotTitle(input);
+  const bodyLines = stripNaverPostForBlogspot(naverPost, title);
+  const plain = [
+    englishSeoLine(input),
+    makeBlogspotSearchDescription(input),
+    "",
+    "Quick Summary",
+    ...makeCheckPoints(input).map((item) => `- ${item}`),
+    "",
+    "Table of Contents",
+    ...blogspotTocItems(input).map((item) => `- ${item}`),
+    "",
+    ...convertLinesToPlain(bodyLines, input),
+  ];
+  return plain.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function stripNaverPostForBlogspot(naverPost, title) {
@@ -748,6 +766,17 @@ function convertLinesToHtml(rawLines, input) {
 
   closeList();
   return html;
+}
+
+function convertLinesToPlain(rawLines, input) {
+  return rawLines.map((line) => {
+    if (!line) return "";
+    if (line.startsWith("· ")) return `- ${line.replace(/^·\s*/, "")}`;
+    if (isBlogspotH2(line)) return blogspotHeading(line);
+    if (isMenuHeading(line, input)) return line;
+    if (/^\[사진/.test(line)) return line;
+    return line;
+  });
 }
 
 function isBlogspotH2(line) {
