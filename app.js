@@ -164,6 +164,7 @@ function handlePhotos(event) {
         note: "",
         role: autoRole(file.name, state.photos.length),
         size: "auto",
+        target: "auto",
         autoMatched: false,
         userEdited: false,
       };
@@ -255,10 +256,30 @@ function autoMatchPhotos(input, force = false) {
     if (photo.userEdited && !force) return;
 
     const role = inferPhotoRole(photo, index, state.photos.length, input);
+    const targetMenu = menuForPhotoTarget(photo, input);
+    const target = photo.target || "auto";
     let caption = photo.caption;
     let note = photo.note;
+    let nextRole = role;
 
-    if (role === "thumbnail") {
+    if (target === "exclude") {
+      nextRole = "exclude";
+      caption = isGenericPhotoCaption(photo.caption) ? `사진 ${index + 1}` : photo.caption;
+      note = photo.note || "";
+    } else if (target === "atmosphere") {
+      nextRole = "interior";
+      caption = isGenericPhotoCaption(photo.caption) ? atmosphereLabels[Math.min(atmosphereIndex, atmosphereLabels.length - 1)] : photo.caption;
+      note = photoNarrativeNote(nextRole, caption, null, input);
+      atmosphereIndex += 1;
+    } else if (target === "menu-intro") {
+      nextRole = "food";
+      caption = isGenericPhotoCaption(photo.caption) ? "같이 주문한 메뉴들" : photo.caption;
+      note = photoNarrativeNote(nextRole, caption, null, input);
+    } else if (targetMenu) {
+      nextRole = /jahe|자헤|madu|마두|생강|꿀|drink|음료/i.test(`${targetMenu.name} ${targetMenu.local}`) ? "drink" : "food";
+      caption = `${targetMenu.name}${targetMenu.local ? `(${targetMenu.local})` : ""}`;
+      note = photoNarrativeNote(nextRole, caption, targetMenu, input);
+    } else if (role === "thumbnail") {
       caption = atmosphereLabels[0];
       note = photoNarrativeNote(role, caption, null, input);
     } else if (role === "interior" || role === "exterior") {
@@ -282,7 +303,7 @@ function autoMatchPhotos(input, force = false) {
     }
 
     if ((force && isGenericPhotoCaption(photo.caption)) || isGenericPhotoCaption(photo.caption) || photo.autoMatched) photo.caption = caption;
-    if ((force && photo.role === "body") || photo.role === "body" || photo.autoMatched) photo.role = role;
+    if (target !== "auto" || (force && photo.role === "body") || photo.role === "body" || photo.autoMatched) photo.role = nextRole;
     if (!photo.note || isGenericPhotoNote(photo.note) || photo.autoMatched) photo.note = note;
     photo.autoMatched = true;
   });
@@ -312,11 +333,20 @@ function inferPhotoRole(photo, index, total, input) {
 }
 
 function matchedMenuForPhoto(photo, input) {
+  const targetMenu = menuForPhotoTarget(photo, input);
+  if (targetMenu) return targetMenu;
   return input.menus.find((menu) => photoMatchesMenu(photo, menu));
 }
 
 function matchedMenuByVisualKey(key, input) {
   return input.menus.find((menu) => menuMatchesVisualKey(menu, key));
+}
+
+function menuForPhotoTarget(photo, input) {
+  const target = photo?.target || "auto";
+  if (!target.startsWith("menu:")) return null;
+  const index = Number(target.split(":")[1]);
+  return Number.isInteger(index) ? input.menus[index] || null : null;
 }
 
 function foodCaptionFromPhoto(photo) {
@@ -471,11 +501,14 @@ function renderPhotos() {
           </select>
         </div>
         <div class="mini-grid">
-          <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="이 사진에 대한 경험 메모">
-          <select data-photo-field="size" aria-label="사진 크기">
-            ${sizeOptions(photo.size)}
+          <select data-photo-field="target" aria-label="본문 위치">
+            ${targetOptions(photo.target, getInput())}
           </select>
+          <select data-photo-field="size" aria-label="사진 크기">
+          ${sizeOptions(photo.size)}
+        </select>
         </div>
+        <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="이 사진에 대한 경험 메모">
       </div>
     </div>
   `).join("");
@@ -487,6 +520,14 @@ function renderPhotos() {
       if (field.dataset.photoField === "size") {
         photo.size = field.value;
         refreshReports();
+        return;
+      }
+      if (field.dataset.photoField === "target") {
+        photo.target = field.value;
+        photo.autoMatched = false;
+        autoMatchPhotos(getInput(), true);
+        renderPhotos();
+        generateAll();
         return;
       }
       photo.userEdited = true;
@@ -510,6 +551,7 @@ function roleOptions(current) {
     ["drink", "음료"],
     ["map", "지도/위치"],
     ["body", "기타"],
+    ["exclude", "제외"],
   ];
   return roles.map(([value, label]) => `<option value="${value}" ${value === current ? "selected" : ""}>${label}</option>`).join("");
 }
@@ -523,6 +565,17 @@ function sizeOptions(current = "auto") {
     ["full", "가득"],
   ];
   return sizes.map(([value, label]) => `<option value="${value}" ${value === (current || "auto") ? "selected" : ""}>${label}</option>`).join("");
+}
+
+function targetOptions(current = "auto", input = getInput()) {
+  const options = [
+    ["auto", "위치 자동"],
+    ["atmosphere", "분위기 파트"],
+    ["menu-intro", "메뉴 소개"],
+    ...input.menus.map((menu, index) => [`menu:${index}`, `${menu.name}${menu.local ? `(${menu.local})` : ""}`]),
+    ["exclude", "원고에서 제외"],
+  ];
+  return options.map(([value, label]) => `<option value="${value}" ${value === (current || "auto") ? "selected" : ""}>${label}</option>`).join("");
 }
 
 function generateAll() {
@@ -792,6 +845,8 @@ function photoLinesForGeneralFood(input) {
 }
 
 function photoMatchesMenu(photo, menu) {
+  const targetMenu = menuForPhotoTarget(photo, getInput());
+  if (targetMenu) return sameMenu(targetMenu, menu);
   const haystack = photoMenuEvidence(photo);
   const targets = [
     menu.name,
@@ -806,6 +861,11 @@ function photoMatchesMenu(photo, menu) {
   if (/jahe|자헤|madu|마두|생강|꿀/.test(menuText) && /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack)) return true;
   if (photo.analysis?.visualMenuConfidence >= 0.6 && menuMatchesVisualKey(menu, photo.analysis.visualMenu)) return true;
   return false;
+}
+
+function sameMenu(a, b) {
+  return normalizePreviewLine(`${a?.name || ""} ${a?.local || ""}`).toLowerCase()
+    === normalizePreviewLine(`${b?.name || ""} ${b?.local || ""}`).toLowerCase();
 }
 
 function photoMenuEvidence(photo) {
@@ -834,6 +894,7 @@ function photoRoleLabel(role) {
     drink: "음료",
     map: "지도/위치",
     body: "기타",
+    exclude: "제외",
   };
   return labels[role] || "기타";
 }
@@ -1268,6 +1329,7 @@ function makePhotoPlan(input) {
     caption: photo.caption || `사진 ${index + 1}`,
     role: photo.role,
     size: photo.size || "auto",
+    target: photo.target || "auto",
     name: photo.name || "",
     note: photo.note || photoPlacementNote(photo, input),
     alt: `${input.place || input.topic} ${photo.caption || photo.role}`,
@@ -1316,6 +1378,9 @@ function photoPlanSettings(input) {
 }
 
 function photoSelectionDecision(photo, menu, counts, settings) {
+  if (photo.target === "exclude" || photo.role === "exclude") return { use: false, reason: "사용자가 원고에서 제외" };
+  const manualTarget = photo.target && photo.target !== "auto";
+  if (manualTarget) return { use: true };
   if (counts.total >= settings.maxTotal) return { use: false, reason: "사진 사용량 설정에 맞춰 제외" };
 
   const captionKey = normalizePreviewLine(photo.caption || photo.name || "");
