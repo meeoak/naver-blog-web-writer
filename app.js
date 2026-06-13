@@ -1247,12 +1247,126 @@ function refreshFromEditor() {
 function refreshReports() {
   const text = $("postEditor").value;
   const tags = parseCommaOrSpaceTags($("tagEditor").value || state.tags.join(" "));
+  renderPostPreview(text, tags);
   renderCounts(text);
   renderKeywordReport(text, tags);
   renderAdReport(text);
   renderAiReport(text);
   renderChecklist(text, tags);
   renderPhotoPlanReport();
+}
+
+function renderPostPreview(text, tags = []) {
+  const preview = $("postPreview");
+  if (!preview) return;
+  const linesRaw = text.split(/\r?\n/);
+  const blocks = [];
+  let listOpen = false;
+  let firstTextSeen = false;
+
+  const closeList = () => {
+    if (listOpen) {
+      blocks.push("</ul>");
+      listOpen = false;
+    }
+  };
+
+  for (let i = 0; i < linesRaw.length; i += 1) {
+    const line = linesRaw[i].trim();
+    if (!line) {
+      closeList();
+      continue;
+    }
+
+    const photoMatch = line.match(/^\[사진\s+(\d+):\s*(.+?)\]$/);
+    if (photoMatch) {
+      closeList();
+      const photoIndex = Number(photoMatch[1]) - 1;
+      const photo = state.photos[photoIndex];
+      const nextLine = (linesRaw[i + 1] || "").trim();
+      const caption = photoMatch[2];
+      const note = shouldUseLineAsPhotoNote(nextLine) ? nextLine : "";
+      if (note) i += 1;
+      blocks.push(renderPreviewPhoto(photo, caption, note));
+      continue;
+    }
+
+    if (line.startsWith("· ") || line.startsWith("- ")) {
+      if (!listOpen) {
+        blocks.push("<ul>");
+        listOpen = true;
+      }
+      blocks.push(`<li>${escapeHtml(line.replace(/^[·-]\s*/, ""))}</li>`);
+      continue;
+    }
+
+    closeList();
+
+    if (!firstTextSeen) {
+      blocks.push(`<h1>${escapeHtml(line)}</h1>`);
+      firstTextSeen = true;
+      continue;
+    }
+
+    if (isPreviewHeading(line)) {
+      blocks.push(`<h2>${escapeHtml(line)}</h2>`);
+    } else if (isPreviewSubheading(line)) {
+      blocks.push(`<h3>${escapeHtml(line)}</h3>`);
+    } else if (/^Q\./.test(line)) {
+      blocks.push(`<h3>${escapeHtml(line)}</h3>`);
+    } else if (/^https?:\/\//.test(line)) {
+      blocks.push(`<p><a href="${escapeAttr(line)}" target="_blank" rel="noopener">${escapeHtml(line)}</a></p>`);
+    } else if (line.startsWith("#")) {
+      blocks.push(`<p class="preview-tags">${parseCommaOrSpaceTags(line).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</p>`);
+    } else {
+      blocks.push(`<p>${escapeHtml(line)}</p>`);
+    }
+  }
+
+  closeList();
+  preview.innerHTML = blocks.join("");
+}
+
+function shouldUseLineAsPhotoNote(line) {
+  if (!line) return false;
+  if (/^\[사진\s+\d+:/i.test(line)) return false;
+  if (/^(·|-)\s/.test(line)) return false;
+  if (/^Q\./.test(line)) return false;
+  if (/^https?:\/\//.test(line)) return false;
+  if (line.startsWith("#")) return false;
+  return !isPreviewHeading(line) && !isPreviewSubheading(line);
+}
+
+function renderPreviewPhoto(photo, caption, note) {
+  if (!photo?.dataUrl) {
+    return `<figure class="preview-photo is-missing"><div>${escapeHtml(caption)}</div>${note ? `<figcaption>${escapeHtml(note)}</figcaption>` : ""}</figure>`;
+  }
+  return `
+    <figure class="preview-photo">
+      <img src="${photo.dataUrl}" alt="${escapeHtml(caption)}">
+      <figcaption>
+        <strong>${escapeHtml(caption)}</strong>
+        ${note ? `<span>${escapeHtml(note)}</span>` : ""}
+      </figcaption>
+    </figure>
+  `;
+}
+
+function isPreviewHeading(line) {
+  return line.endsWith("는 이런 곳이야") || [
+    "다시 가도 좋았던 이유",
+    "방문한 날의 기록",
+    "분위기가 먼저 예쁜 곳",
+    "방문해서 먹은 메뉴",
+    "예약과 방문 팁",
+    "방문 전 자주 묻는 질문",
+    "위치와 이동 팁",
+    "결론은,, 다시 갈 만한 곳",
+  ].includes(line);
+}
+
+function isPreviewSubheading(line) {
+  return getInput().menus.some((menu) => line === `${menu.name}${menu.local ? `(${menu.local})` : ""}`);
 }
 
 function renderCounts(text) {
