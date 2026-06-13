@@ -255,6 +255,29 @@ textarea {
   gap: 7px;
 }
 
+.photo-analysis {
+  display: grid;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 1px solid #e2dfd7;
+  border-radius: 8px;
+  background: #fbf8f1;
+}
+
+.photo-analysis strong {
+  overflow: hidden;
+  color: var(--sage);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-analysis span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .photo-fields .mini-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 120px;
