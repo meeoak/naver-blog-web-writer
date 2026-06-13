@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-reading-rhythm">
+  <link rel="stylesheet" href="styles.css?v=20260613-voice-edit-polish">
 </head>
 <body>
   <main class="app-shell">
@@ -179,6 +179,8 @@ Casa Residence에서 가까워서 들르기 편함
           <button type="button" data-insert="h3">메뉴 제목</button>
           <button type="button" data-insert="photo">사진 위치</button>
           <button type="button" data-insert="faq">FAQ</button>
+          <button type="button" id="polishPostBtn">글 꾸미기</button>
+          <button type="button" id="toggleEditorBtn">직접 수정</button>
           <button type="button" id="fixAiBtn">AI 느낌 줄이기</button>
           <button type="button" id="copyStyledPostBtn">꾸민 원고 복사</button>
           <button type="button" id="copyPostBtn">원고 복사</button>
@@ -186,7 +188,13 @@ Casa Residence에서 가까워서 들르기 편함
         </div>
         <div id="titleCandidates" class="title-candidates"></div>
         <article id="postPreview" class="post-preview" aria-label="사진 포함 원고 미리보기"></article>
-        <textarea id="postEditor" class="post-editor" spellcheck="false"></textarea>
+        <div id="editorShell" class="editor-shell is-hidden">
+          <div class="editor-shell-head">
+            <strong>원고 직접 수정</strong>
+            <span>여기에서 고치면 위 미리보기에 바로 반영돼요.</span>
+          </div>
+          <textarea id="postEditor" class="post-editor" spellcheck="false"></textarea>
+        </div>
       </section>
 
       <section id="blogspotTab" class="tab-panel">
@@ -258,6 +266,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260613-reading-rhythm"></script>
+  <script src="app.js?v=20260613-voice-edit-polish"></script>
 </body>
 </html>

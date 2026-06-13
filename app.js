@@ -54,6 +54,7 @@ const adRules = [
 
 document.addEventListener("DOMContentLoaded", () => {
   loadOpenAISettings();
+  loadVoiceSettings();
   bindEvents();
   renderVoicePresets();
   renderPhotos();
@@ -74,6 +75,7 @@ function bindEvents() {
     $(id).addEventListener("input", saveOpenAISettings);
   });
   $("saveVoiceBtn").addEventListener("click", saveVoicePreset);
+  $("voiceInput").addEventListener("input", debounce(saveActiveVoice, 250));
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
   $("downloadThumbBtn").addEventListener("click", downloadThumbnail);
@@ -84,6 +86,8 @@ function bindEvents() {
   $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
   $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
   $("aiSearchReviewBtn").addEventListener("click", runAIWebReview);
+  $("polishPostBtn").addEventListener("click", polishPostLayout);
+  $("toggleEditorBtn").addEventListener("click", () => setEditorVisible(!$("editorShell").classList.contains("is-visible")));
   $("fixAiBtn").addEventListener("click", fixAiSmell);
   $("tagEditor").addEventListener("input", () => {
     state.tags = parseCommaOrSpaceTags($("tagEditor").value);
@@ -900,6 +904,7 @@ function applyOpenAIResult(result, input) {
   renderTitleCandidates();
   drawThumbnail();
   refreshReports();
+  setEditorVisible(false);
   activateTab("naver");
 }
 
@@ -2454,8 +2459,81 @@ function fixAiSmell() {
   refreshReports();
 }
 
+function polishPostLayout() {
+  let text = $("postEditor").value || "";
+  text = text
+    .replace(/```(?:markdown|html|text)?/gi, "")
+    .replace(/```/g, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim());
+  const polished = [];
+
+  lines.forEach((line, index) => {
+    if (!line) {
+      pushBlank(polished);
+      return;
+    }
+
+    const previous = polished[polished.length - 1] || "";
+    const isPhoto = /^\[사진\s+\d+(?::.*)?\]$/.test(line);
+    const isFaq = /^(Q\.|A\.)/.test(line);
+    const isTagLine = line.startsWith("#");
+    const isBullet = /^(·|-)\s/.test(line);
+    const isLikelyHeading = isPolishHeading(line, index);
+
+    if (isPhoto || isFaq || isTagLine || isLikelyHeading) {
+      pushBlank(polished);
+      polished.push(line);
+      if (isLikelyHeading || isTagLine) pushBlank(polished);
+      return;
+    }
+
+    if (isBullet) {
+      if (previous && !/^(·|-)\s/.test(previous)) pushBlank(polished);
+      polished.push(line.replace(/^-\s/, "· "));
+      return;
+    }
+
+    polished.push(line);
+  });
+
+  $("postEditor").value = polished.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  refreshReports();
+  setEditorVisible(false);
+  setAiStatus("글 꾸미기 완료. 소제목, 단락, 사진 위치 표시를 보기 좋게 정리했어.");
+}
+
+function pushBlank(lines) {
+  if (lines.length && lines[lines.length - 1] !== "") lines.push("");
+}
+
+function isPolishHeading(line, index) {
+  if (!line || line.length > 34) return false;
+  if (/^\[사진|^#|^(Q\.|A\.)|^(·|-)\s/.test(line)) return false;
+  if (index === 0) return true;
+  if (/[.!?。]$/.test(line)) return false;
+  return /(이유|기록|곳|메뉴|분위기|후기|팁|예약|위치|이동|FAQ|정리|결론|맛|추천|방문|사진)/.test(line);
+}
+
+function setEditorVisible(visible) {
+  const shell = $("editorShell");
+  const button = $("toggleEditorBtn");
+  if (!shell || !button) return;
+  shell.classList.toggle("is-hidden", !visible);
+  shell.classList.toggle("is-visible", visible);
+  button.textContent = visible ? "수정창 숨기기" : "직접 수정";
+  if (visible) $("postEditor").focus();
+}
+
 function insertSnippet(type) {
   const editor = $("postEditor");
+  setEditorVisible(true);
   const snippets = {
     h2: "\n\n새 단락 제목\n",
     h3: "\n\n메뉴명\n이 메뉴는 내 기준으로...\n",
@@ -2479,7 +2557,18 @@ function saveVoicePreset() {
   if (!value) return;
   state.voicePresets = unique([value, ...state.voicePresets]).slice(0, 8);
   localStorage.setItem("naverBlogVoicePresets", JSON.stringify(state.voicePresets));
+  localStorage.setItem("naverBlogLatestVoice", value);
   renderVoicePresets();
+}
+
+function loadVoiceSettings() {
+  const latest = localStorage.getItem("naverBlogLatestVoice") || state.voicePresets[0] || "";
+  if (latest && $("voiceInput")) $("voiceInput").value = latest;
+}
+
+function saveActiveVoice() {
+  const value = $("voiceInput").value.trim();
+  if (value) localStorage.setItem("naverBlogLatestVoice", value);
 }
 
 function loadVoicePresets() {
@@ -2497,6 +2586,7 @@ function renderVoicePresets() {
   $("voicePresetList").querySelectorAll(".chip").forEach((button) => {
     button.addEventListener("click", () => {
       $("voiceInput").value = button.dataset.preset;
+      saveActiveVoice();
     });
   });
 }

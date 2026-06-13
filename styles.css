@@ -381,6 +381,37 @@ textarea {
   font-size: 12px;
 }
 
+.editor-shell {
+  margin-top: 12px;
+}
+
+.editor-shell.is-hidden {
+  display: none;
+}
+
+.editor-shell.is-visible {
+  display: block;
+}
+
+.editor-shell-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 980px;
+  margin: 0 0 8px;
+  color: var(--sage);
+}
+
+.editor-shell-head strong {
+  font-size: 15px;
+}
+
+.editor-shell-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .post-editor {
   width: 100%;
   min-height: 360px;
