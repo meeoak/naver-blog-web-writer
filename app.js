@@ -85,6 +85,7 @@ function bindEvents() {
     copyText($("postEditor").value);
   });
   $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
+  $("exportGoogleDocsBtn").addEventListener("click", exportToGoogleDocs);
   $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
   $("downloadPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
@@ -3207,6 +3208,39 @@ function copyText(text) {
 }
 
 async function copyStyledPost() {
+  const { html, plain } = buildPostExportHtml();
+  try {
+    const copiedRich = await copyRichHtml(html, plain);
+    setAiStatus(copiedRich
+      ? "꾸민 원고를 복사했어. 네이버 블로그 글쓰기 화면에 붙여넣어 봐."
+      : "브라우저가 꾸민 복사를 지원하지 않아서 일반 원고로 복사했어.");
+  } catch (error) {
+    await navigator.clipboard.writeText(plain);
+    setAiStatus("브라우저가 꾸민 복사를 막아서 일반 원고로 복사했어.", true);
+  }
+}
+
+async function exportToGoogleDocs() {
+  const docsWindow = window.open("https://docs.new", "_blank", "noopener");
+  const { html, plain } = buildPostExportHtml();
+  try {
+    const copiedRich = await copyRichHtml(html, plain);
+    if (!copiedRich) {
+      downloadGoogleDocsHtml(html);
+      setAiStatus("브라우저가 사진 포함 복사를 지원하지 않아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
+      return;
+    }
+    const openGuide = docsWindow
+      ? "새로 열린 Google Docs 빈 문서에 Ctrl+V로 붙여넣으면 돼."
+      : "Google Docs에서 새 문서를 열고 Ctrl+V로 붙여넣으면 돼.";
+    setAiStatus(`구글문서용으로 사진 포함 원고를 복사했어. ${openGuide}`);
+  } catch (error) {
+    downloadGoogleDocsHtml(html);
+    setAiStatus("브라우저가 사진 포함 복사를 막아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
+  }
+}
+
+function buildPostExportHtml() {
   syncPreviewEditsIfNeeded({ silent: true });
   refreshReports();
   const preview = $("postPreview");
@@ -3222,18 +3256,36 @@ async function copyStyledPost() {
     </article>
   `;
   const plain = $("postEditor").value;
-  try {
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([plain], { type: "text/plain" }),
-      }),
-    ]);
-    setAiStatus("꾸민 원고를 복사했어. 네이버 블로그 글쓰기 화면에 붙여넣어 봐.");
-  } catch (error) {
+  return { html, plain };
+}
+
+async function copyRichHtml(html, plain) {
+  if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+  if (!window.ClipboardItem || !navigator.clipboard.write) {
     await navigator.clipboard.writeText(plain);
-    setAiStatus("브라우저가 꾸민 복사를 막아서 일반 원고로 복사했어.", true);
+    return false;
   }
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([plain], { type: "text/plain" }),
+    }),
+  ]);
+  return true;
+}
+
+function downloadGoogleDocsHtml(html) {
+  const documentHtml = `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>네이버 블로그 원고</title>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+  downloadBlob("google-docs-post.html", new Blob([documentHtml], { type: "text/html;charset=utf-8" }));
 }
 
 function applyInlinePostStyles(root) {
@@ -3289,7 +3341,10 @@ function inlineParagraphToneColor(element) {
 }
 
 function downloadText(filename, text) {
-  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  downloadBlob(filename, new Blob([text], { type: "text/plain;charset=utf-8" }));
+}
+
+function downloadBlob(filename, blob) {
   const link = document.createElement("a");
   link.download = filename;
   link.href = URL.createObjectURL(blob);
