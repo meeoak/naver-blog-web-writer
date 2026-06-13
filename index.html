@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>네이버 블로그 작성기</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="input-pane" aria-label="입력">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Ara in Indonesia</p>
+          <h1>네이버 블로그 작성기</h1>
+        </div>
+        <button class="icon-btn" id="resetBtn" type="button" title="입력 초기화" aria-label="입력 초기화">
+          <span aria-hidden="true">↺</span>
+        </button>
+      </header>
+
+      <div class="field-grid">
+        <label>
+          <span>글 주제</span>
+          <input id="topicInput" type="text" value="Pesta Kebun Kota Kasablanka 후기">
+        </label>
+        <label>
+          <span>장소명</span>
+          <input id="placeInput" type="text" value="Pesta Kebun Kota Kasablanka">
+        </label>
+        <label>
+          <span>방문 날짜</span>
+          <input id="dateInput" type="text" value="2026년 6월 평일 저녁">
+        </label>
+        <label>
+          <span>그날 상황</span>
+          <input id="situationInput" type="text" value="퇴근 후 밥 먹고 들어가려고 들렀고, 운 좋게 대기 없이 앉았다.">
+        </label>
+      </div>
+
+      <label class="stacked">
+        <span>경험 메모</span>
+        <textarea id="experienceInput" rows="8">Kokas 몰 안에서 좋아하는 식당 중 하나
+Casa Residence에서 가까워서 들르기 편함
+사테, 우당 바카르, 자헤 마두를 먹음
+우당 바카르가 이날 제일 기억에 남음
+한국인 입맛 기준으로도 무난함
+점심이나 저녁 피크 시간에는 대기가 있을 수 있음</textarea>
+      </label>
+
+      <label class="stacked">
+        <span>먹은 메뉴</span>
+        <textarea id="menuInput" rows="5">사테(Sate) | 땅콩소스가 진하고 고소해서 밥이랑 잘 맞았다
+우당 바카르(Udang Bakar) | 단짠 양념과 구운 향이 좋았고 이날 제일 만족스러웠다
+자헤 마두(Jahe Madu) | 생강꿀차 같은 따뜻한 음료라 마무리로 좋았다</textarea>
+      </label>
+
+      <div class="field-grid">
+        <label>
+          <span>한국어 검색어</span>
+          <input id="keywordKoInput" type="text" value="자카르타 맛집, 코타카사블랑카 맛집, 인도네시아 음식, 인도네시아 주재원">
+        </label>
+        <label>
+          <span>구글/블로그스팟 검색어</span>
+          <input id="keywordGoogleInput" type="text" value="Pesta Kebun Kota Kasablanka, Pesta Kebun Kokas, Kota Kasablanka, Sate, Udang Bakar, Jahe Madu">
+        </label>
+        <label>
+          <span>썸네일 제목</span>
+          <input id="thumbTitleInput" type="text" value="Pesta Kebun Kokas">
+        </label>
+        <label>
+          <span>리본 문구</span>
+          <input id="thumbRibbonInput" type="text" value="Pilihan Orang Korea">
+        </label>
+      </div>
+
+      <section class="tool-surface">
+        <div class="section-head">
+          <div>
+            <h2>사진</h2>
+            <p>첫 사진은 썸네일 배경 후보로 써요.</p>
+          </div>
+          <label class="file-btn">
+            사진 추가
+            <input id="photoInput" type="file" accept="image/*" multiple>
+          </label>
+        </div>
+        <div id="photoList" class="photo-list"></div>
+      </section>
+
+      <section class="tool-surface">
+        <div class="section-head">
+          <div>
+            <h2>말투 프리셋</h2>
+            <p>자주 쓰는 내 표현을 저장해두고 글에 반영해요.</p>
+          </div>
+          <button id="saveVoiceBtn" class="secondary-btn" type="button">저장</button>
+        </div>
+        <textarea id="voiceInput" rows="3">나는 성격이 급해서 대기가 길면 갈 엄두가 잘 안 나는데, 이날은 바로 앉을 수 있어서 좋았어.</textarea>
+        <div id="voicePresetList" class="chip-row"></div>
+      </section>
+
+      <div class="action-row">
+        <button id="generateBtn" class="primary-btn" type="button">글 생성</button>
+        <button id="refreshReportBtn" class="secondary-btn" type="button">수정 내용 분석</button>
+        <button id="dietTagsBtn" class="secondary-btn" type="button">태그 정리</button>
+      </div>
+    </section>
+
+    <section class="work-pane" aria-label="작성">
+      <nav class="tab-bar" aria-label="결과 탭">
+        <button class="tab is-active" data-tab="naver" type="button">네이버 원고</button>
+        <button class="tab" data-tab="blogspot" type="button">블로그스팟</button>
+        <button class="tab" data-tab="thumbnail" type="button">썸네일</button>
+        <button class="tab" data-tab="report" type="button">리포트</button>
+      </nav>
+
+      <section id="naverTab" class="tab-panel is-active">
+        <div class="editor-toolbar">
+          <button type="button" data-insert="h2">단락 제목</button>
+          <button type="button" data-insert="h3">메뉴 제목</button>
+          <button type="button" data-insert="photo">사진 위치</button>
+          <button type="button" data-insert="faq">FAQ</button>
+          <button type="button" id="fixAiBtn">AI 느낌 줄이기</button>
+          <button type="button" id="copyPostBtn">원고 복사</button>
+          <button type="button" id="downloadPostBtn">원고 저장</button>
+        </div>
+        <div id="titleCandidates" class="title-candidates"></div>
+        <textarea id="postEditor" class="post-editor" spellcheck="false"></textarea>
+      </section>
+
+      <section id="blogspotTab" class="tab-panel">
+        <div class="editor-toolbar">
+          <button type="button" id="copyBlogspotBtn">블로그스팟 복사</button>
+          <button type="button" id="downloadBlogspotBtn">블로그스팟 저장</button>
+        </div>
+        <textarea id="blogspotEditor" class="post-editor" spellcheck="false"></textarea>
+      </section>
+
+      <section id="thumbnailTab" class="tab-panel">
+        <div class="thumbnail-layout">
+          <canvas id="thumbnailCanvas" width="1280" height="720"></canvas>
+          <div class="thumbnail-controls">
+            <label>
+              <span>브랜드 라벨</span>
+              <input id="brandInput" type="text" value="Ara in Indonesia">
+            </label>
+            <label>
+              <span>강조 색</span>
+              <input id="accentInput" type="color" value="#d86b79">
+            </label>
+            <button id="renderThumbBtn" class="secondary-btn" type="button">썸네일 다시 그리기</button>
+            <button id="downloadThumbBtn" class="primary-btn" type="button">썸네일 저장</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="reportTab" class="tab-panel">
+        <div class="report-grid">
+          <section class="report-block">
+            <h2>글자수</h2>
+            <div id="countReport"></div>
+          </section>
+          <section class="report-block">
+            <h2>예상 유입 키워드</h2>
+            <div id="keywordReport"></div>
+          </section>
+          <section class="report-block">
+            <h2>예상 광고</h2>
+            <div id="adReport"></div>
+          </section>
+          <section class="report-block">
+            <h2>태그</h2>
+            <textarea id="tagEditor" rows="5"></textarea>
+          </section>
+          <section class="report-block">
+            <h2>AI 느낌 검사</h2>
+            <div id="aiReport"></div>
+          </section>
+          <section class="report-block">
+            <h2>업로드 체크리스트</h2>
+            <div id="checklistReport"></div>
+          </section>
+          <section class="report-block wide">
+            <h2>사진 배치</h2>
+            <div id="photoPlanReport"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
+
