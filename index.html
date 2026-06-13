@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260614-text-rhythm">
+  <link rel="stylesheet" href="styles.css?v=20260614-photo-defaults">
 </head>
 <body>
   <main class="app-shell">
@@ -90,19 +90,19 @@ Casa Residence에서 가까워서 들르기 편함
           <label>
             <span>사진 사용량</span>
             <select id="photoDensityInput">
-              <option value="recommended" selected>추천컷만</option>
+              <option value="all" selected>모두 넣기</option>
+              <option value="recommended">추천컷만</option>
               <option value="many">조금 더 많이</option>
-              <option value="all">넉넉히 넣기</option>
             </select>
           </label>
           <label>
             <span>전체 사진 크기</span>
             <select id="bulkPhotoSizeInput">
-              <option value="auto" selected>자동 크기</option>
+              <option value="full" selected>제일 크게</option>
+              <option value="auto">자동 크기</option>
               <option value="small">작게</option>
               <option value="medium">보통</option>
               <option value="large">크게</option>
-              <option value="full">가득</option>
             </select>
           </label>
           <label>
@@ -264,6 +264,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260614-text-rhythm"></script>
+  <script src="app.js?v=20260614-photo-defaults"></script>
 </body>
 </html>

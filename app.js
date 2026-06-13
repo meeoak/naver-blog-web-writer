@@ -176,7 +176,7 @@ function getInput() {
     thumbRibbon: $("thumbRibbonInput").value.trim(),
     brand: $("brandInput").value.trim() || "Ara in Indonesia",
     voice: $("voiceInput").value.trim(),
-    photoDensity: $("photoDensityInput").value || "recommended",
+    photoDensity: $("photoDensityInput").value || "all",
     photoCaptionMode: $("photoCaptionModeInput").value || "safe",
   };
 }
@@ -224,7 +224,7 @@ function handlePhotos(event) {
         caption: autoCaption(file.name, state.photos.length),
         note: "",
         role: autoRole(file.name, state.photos.length),
-        size: "auto",
+        size: $("bulkPhotoSizeInput").value || "full",
         target: "auto",
         autoMatched: false,
         userEdited: false,
@@ -235,7 +235,7 @@ function handlePhotos(event) {
       renderPhotos();
       drawThumbnail();
       refreshReports();
-      updatePhotoStatus(`${loaded}장 추가됨. 사진 분석 중이야. 분석이 끝나면 블로그에 어울리는 컷만 골라 원고에 반영돼.`);
+      updatePhotoStatus(`${loaded}장 추가됨. 사진 분석 중이야. 기본값은 직접 제외한 사진만 빼고 모두 원고에 반영돼.`);
       analyzePhotoVisual(photo).then(() => {
         autoMatchPhotos(getInput(), false);
         renderPhotos();
@@ -263,7 +263,7 @@ function updatePhotoStatus(message) {
 }
 
 function applyBulkPhotoSize() {
-  const size = $("bulkPhotoSizeInput").value || "auto";
+  const size = $("bulkPhotoSizeInput").value || "full";
   state.photos.forEach((photo) => {
     photo.size = size;
   });
@@ -278,9 +278,9 @@ function photoSizeLabel(size) {
     small: "작게",
     medium: "보통",
     large: "크게",
-    full: "가득",
+    full: "제일 크게",
   };
-  return labels[size] || "자동 크기";
+  return labels[size] || "제일 크게";
 }
 
 function autoCaption(filename, index) {
@@ -306,7 +306,7 @@ function autoMatchPhotosFromButton() {
   autoMatchPhotos(getInput(), true);
   renderPhotos();
   generateAll();
-  updatePhotoStatus(`${state.photos.length}장 중 대표컷만 골랐어. 사진 설명은 직접 쓴 메모가 있을 때만 반영돼.`);
+  updatePhotoStatus(`${state.photos.length}장을 원고에 넣을 수 있게 사진 설명과 위치를 다시 정리했어.`);
 }
 
 function autoMatchPhotos(input, force = false) {
@@ -693,7 +693,7 @@ function setAiStatus(message, isError = false) {
 }
 
 async function prepareOpenAIPhotos(input) {
-  const limit = input.photoDensity === "all" ? 24 : input.photoDensity === "many" ? 18 : 14;
+  const limit = input.photoDensity === "all" ? state.photos.length : input.photoDensity === "many" ? 18 : 14;
   const photos = state.photos.slice(0, limit);
   const prepared = [];
 
@@ -811,6 +811,7 @@ function makeOpenAIPrompt(input, aiPhotos) {
   const experience = input.experience.map((item) => `- ${item}`).join("\n") || "경험 메모 없음";
   const keywords = [...input.keywordsKo, ...input.keywordsGoogle].join(", ");
   const photoNumbers = aiPhotos.map((photo) => `사진 ${photo.index}`).join(", ") || "사진 없음";
+  const photoDensityLabel = input.photoDensity === "recommended" ? "추천컷만" : input.photoDensity === "many" ? "조금 더 많이" : "모두 넣기";
   const extraInstruction = $("aiInstructionInput").value.trim();
   const voiceSamples = [input.voice, ...state.voicePresets].filter(Boolean).slice(0, 6).map((item) => `- ${item}`).join("\n") || "- 담백한 1인칭 후기체";
 
@@ -856,6 +857,9 @@ ${keywords}
 [사용 가능한 사진 번호]
 ${photoNumbers}
 
+[사진 사용량 설정]
+${photoDensityLabel}
+
 [원고 규칙]
 - naver_post는 제목부터 시작하는 완성 원고로 작성한다.
 - 한국어 중심으로 쓰고, 필요한 곳에 Pesta Kebun, Kokas, Kota Kasablanka 같은 검색어를 자연스럽게 넣는다.
@@ -866,7 +870,8 @@ ${photoNumbers}
 - 사진을 넣을 위치에는 반드시 [사진 1: 짧은 캡션] 형식을 사용한다.
 - [사진 N: 캡션] 바로 다음 줄에는 사진을 설명하는 자연스러운 1문장을 쓴다.
 - 사진 번호는 제공된 사진 번호만 사용한다.
-- 모든 사진을 억지로 쓰지 말고, 블로그에 어울리는 사진만 골라 쓴다.
+- 사진 사용량 설정이 "모두 넣기"이면 직접 제외된 사진만 빼고 제공된 사진을 모두 쓴다.
+- 사진 사용량 설정이 "추천컷만" 또는 "조금 더 많이"일 때만 블로그에 어울리는 사진을 선별한다.
 - 글 끝에는 FAQ와 태그를 포함한다.
 - 태그는 18개 이하로 추천한다.
 - "추천드립니다", "만족스러운 경험", "도움이 되었으면 합니다" 같은 AI식 표현은 피한다.
@@ -1936,12 +1941,12 @@ function selectedPhotoPlan(input) {
 }
 
 function photoPlanSettings(input) {
-  const density = input.photoDensity || "recommended";
+  const density = input.photoDensity || "all";
   if (density === "recommended") {
     return { maxTotal: 11, atmosphere: 3, menuBoard: 1, drink: 2, perMenu: 2, sameCaption: 2, menuPlacement: 2, minScore: 58 };
   }
   if (density === "all") {
-    return { maxTotal: Math.min(Math.max(state.photos.length, 1), 18), atmosphere: 6, menuBoard: 2, drink: 4, perMenu: 4, sameCaption: 5, menuPlacement: 4, minScore: 46 };
+    return { includeAll: true, maxTotal: Math.max(state.photos.length, 1), atmosphere: state.photos.length, menuBoard: state.photos.length, drink: state.photos.length, perMenu: state.photos.length, sameCaption: state.photos.length, menuPlacement: state.photos.length, minScore: 0 };
   }
   return { maxTotal: 14, atmosphere: 4, menuBoard: 1, drink: 3, perMenu: 3, sameCaption: 3, menuPlacement: 3, minScore: 52 };
 }
@@ -1950,6 +1955,7 @@ function photoSelectionDecision(photo, menu, counts, settings) {
   if (photo.target === "exclude" || photo.role === "exclude") return { use: false, reason: "사용자가 원고에서 제외" };
   const manualTarget = photo.target && photo.target !== "auto";
   if (manualTarget) return { use: true };
+  if (settings.includeAll) return { use: true };
   if (counts.total >= settings.maxTotal) return { use: false, reason: "사진 사용량 설정에 맞춰 제외" };
   if (photo.blogScore < settings.minScore) return { use: false, reason: "블로그 컷으로 약해서 제외" };
 
