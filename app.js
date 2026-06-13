@@ -223,7 +223,7 @@ function autoMatchPhotosFromButton() {
 
 function autoMatchPhotos(input, force = false) {
   if (!state.photos.length) return;
-  const atmosphereLabels = ["대표 분위기", "입구와 분위기", "내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명"];
+  const atmosphereLabels = ["입구와 전체 분위기", "따뜻한 내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명"];
   let atmosphereIndex = 0;
   let foodIndex = 0;
 
@@ -236,26 +236,26 @@ function autoMatchPhotos(input, force = false) {
 
     if (role === "thumbnail") {
       caption = atmosphereLabels[0];
-      note = "대표 사진과 썸네일에 쓰기 좋은 사진.";
+      note = photoNarrativeNote(role, caption, null, input);
     } else if (role === "interior" || role === "exterior") {
-      caption = atmosphereLabels[Math.min(atmosphereIndex + 1, atmosphereLabels.length - 1)];
-      note = "분위기 설명 파트에 넣기 좋은 사진.";
+      caption = atmosphereLabels[Math.min(atmosphereIndex, atmosphereLabels.length - 1)];
+      note = photoNarrativeNote(role, caption, null, input);
       atmosphereIndex += 1;
     } else if (role === "menu") {
       caption = "메뉴판";
-      note = "방문해서 먹은 메뉴를 소개하기 전에 넣기 좋은 사진.";
+      note = photoNarrativeNote(role, caption, null, input);
     } else if (role === "drink") {
       const menu = matchedMenuForPhoto(photo, input) || input.menus.find((item) => /jahe|madu|자헤|마두|음료|drink/i.test(`${item.name} ${item.local}`)) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
       caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음료";
-      note = `${caption} 후기 파트에 넣기 좋은 사진.`;
+      note = photoNarrativeNote(role, caption, menu, input);
     } else if (role === "food") {
       const menu = matchedMenuForPhoto(photo, input) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
       caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음식 사진";
-      note = `${caption} 후기 파트에 넣기 좋은 사진.`;
+      note = photoNarrativeNote(role, caption, menu, input);
       foodIndex += 1;
     } else {
       caption = isGenericPhotoCaption(photo.caption) ? `사진 ${index + 1}` : photo.caption;
-      note = "본문 흐름에 맞춰 보조 사진으로 넣기 좋은 사진.";
+      note = photoNarrativeNote(role, caption, null, input);
     }
 
     if ((force && isGenericPhotoCaption(photo.caption)) || isGenericPhotoCaption(photo.caption) || photo.autoMatched) photo.caption = caption;
@@ -275,7 +275,10 @@ function inferPhotoRole(photo, index, total, input) {
   if (/sate|satay|udang|bakar|shrimp|food|dish|plate|사테|우당|새우|음식|요리|밥/.test(text)) return "food";
   if (/entrance|exterior|outside|입구|외관|간판/.test(text)) return "exterior";
   if (/interior|inside|table|seat|bar|내부|분위기|자리|조명|소품/.test(text)) return index === 0 ? "thumbnail" : "interior";
-  if (photo.analysis?.visualRole) return index === 0 ? "thumbnail" : photo.analysis.visualRole;
+  if (photo.analysis?.visualRole) {
+    if (photo.analysis.visualRole === "food") return "food";
+    return index === 0 ? "thumbnail" : photo.analysis.visualRole;
+  }
   if (!photo.autoMatched && photo.role && photo.role !== "body") return photo.role;
   if (index === 0) return "thumbnail";
   if (index < Math.min(4, total)) return "interior";
@@ -288,11 +291,11 @@ function matchedMenuForPhoto(photo, input) {
 }
 
 function isGenericPhotoCaption(caption) {
-  return !caption || /^사진\s*\d+$/i.test(caption) || ["입구와 분위기", "대표 분위기", "내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명", "음식 사진", "음료"].includes(caption);
+  return !caption || /^사진\s*\d+$/i.test(caption) || ["입구와 분위기", "대표 분위기", "입구와 전체 분위기", "따뜻한 내부 분위기", "내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명", "음식 사진", "음료", "한국인 입맛"].includes(caption);
 }
 
 function isGenericPhotoNote(note) {
-  return !note || /^역할이\s/.test(note) || /사진 설명/.test(note) || /보조 사진/.test(note);
+  return !note || /^역할이\s/.test(note) || /사진 설명/.test(note) || /보조 사진/.test(note) || /넣기 좋은 사진/.test(note) || /썸네일에 쓰기 좋은 사진/.test(note);
 }
 
 function analyzePhotoVisual(photo) {
@@ -1219,14 +1222,44 @@ function registerSelectedPhoto(photo, menu, counts) {
   }
 }
 
-function photoPlacementNote(photo) {
-  if (photo.role === "thumbnail") return "첫 화면과 썸네일에 쓰기 좋은 사진.";
-  if (photo.role === "interior") return "분위기 설명 파트에 넣기 좋은 사진.";
-  if (photo.role === "food") return "메뉴 후기 파트에 넣기 좋은 사진.";
-  if (photo.role === "drink") return "음료 후기 파트에 넣기 좋은 사진.";
-  if (photo.role === "menu") return "메뉴 설명 앞에 넣기 좋은 사진.";
-  if (photo.role === "map") return "위치와 이동 팁 파트에 넣기 좋은 사진.";
-  return `역할이 ${photoRoleLabel(photo.role)}로 되어 있어. 더 정확히 반영하려면 역할을 음식, 음료, 분위기 중 하나로 바꿔줘.`;
+function photoPlacementNote(photo, input = getInput()) {
+  const menu = matchedMenuForPhoto(photo, input);
+  return photoNarrativeNote(photo.role, photo.caption, menu, input);
+}
+
+function photoNarrativeNote(role, caption, menu, input) {
+  const place = shortPlace(input.place || input.topic || "이곳");
+  const label = `${caption || ""} ${menu?.name || ""} ${menu?.local || ""}`.toLowerCase();
+
+  if (/sate|satay|사테/.test(label)) {
+    return "땅콩소스가 넉넉하게 올라간 사테. 고소한 맛이 먼저 느껴지고, 라임을 살짝 곁들이면 훨씬 깔끔하게 먹기 좋았어.";
+  }
+
+  if (/udang|우당|새우|shrimp/.test(label)) {
+    return "우당 바카르는 양념이 잘 배어 있는 구운 새우라서 밥이랑 같이 먹기 좋았어. 삼발은 조금씩 곁들이는 쪽이 내 입맛에는 더 잘 맞았어.";
+  }
+
+  if (/jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(label) || role === "drink") {
+    return "자헤 마두는 생강 향이 먼저 올라오고 뒤에 꿀 단맛이 남는 따뜻한 음료였어. 양념 진한 음식을 먹고 나서 마무리하기 괜찮았어.";
+  }
+
+  if (role === "food") {
+    return "음식이 테이블에 놓이면 소스 색감이 먼저 눈에 들어와. 사진처럼 밥이랑 같이 먹기 좋은 메뉴라 여러 가지를 나눠 먹는 흐름이 괜찮았어.";
+  }
+
+  if (role === "menu") {
+    return "메뉴 이름이 낯설 수 있지만 재료 단어를 조금 알면 고르기 훨씬 쉬워. 처음이라면 익숙한 구이 메뉴부터 보는 것도 괜찮아.";
+  }
+
+  if (role === "thumbnail" || role === "interior" || role === "exterior") {
+    return `${place}는 조명이 따뜻하고 나무톤 분위기가 살아 있어서, 음식 나오기 전부터 기분이 좋아지는 쪽의 식당이야.`;
+  }
+
+  if (role === "map") {
+    return "코타카사블랑카 몰 안에 있어서 그랩이나 택시로 이동하기 편했고, 약속 전후로 들르기에도 동선이 괜찮았어.";
+  }
+
+  return "이 장면은 글 흐름 중간에 넣으면 방문한 날의 분위기를 조금 더 실제처럼 보여줄 수 있어.";
 }
 
 function renderTitleCandidates() {
