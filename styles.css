@@ -567,12 +567,11 @@ textarea {
 }
 
 .post-preview p.is-important {
-  margin-top: 8px;
-  margin-bottom: 22px;
-  padding: 15px 18px;
-  border-left: 0;
-  border-radius: 6px;
-  background: #f8f5ed;
+  margin-top: 2px;
+  margin-bottom: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #1e3d32;
   font-weight: 600;
 }
@@ -594,21 +593,29 @@ textarea {
 }
 
 .post-preview.is-polished p.is-important.tone-menu {
-  background: #fbf6ef;
+  background: transparent;
 }
 
 .post-preview.is-polished p.is-important.tone-place,
 .post-preview.is-polished p.is-important.tone-atmosphere {
-  background: #f4f8f2;
+  background: transparent;
 }
 
 .post-preview.is-polished p.is-important.tone-tip {
-  background: #fbf8f1;
+  background: transparent;
 }
 
 .preview-keyword {
   color: #17483b;
   font-weight: 800;
+}
+
+.preview-highlight {
+  padding: 0 .14em;
+  border-radius: 2px;
+  background: linear-gradient(transparent 58%, #fff0bd 58%);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .post-preview a {

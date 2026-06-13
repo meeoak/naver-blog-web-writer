@@ -2167,7 +2167,10 @@ function renderPostPreview(text, tags = []) {
     } else {
       const paragraphClass = previewParagraphClass(line, { highlightedInSection });
       if (paragraphClass.split(/\s+/).includes("is-important")) highlightedInSection = true;
-      blocks.push(`<p${paragraphClass ? ` class="${paragraphClass}"` : ""}>${formatPreviewInline(line)}</p>`);
+      const paragraphBody = paragraphClass.split(/\s+/).includes("is-important")
+        ? `<span class="preview-highlight">${formatPreviewInline(line)}</span>`
+        : formatPreviewInline(line);
+      blocks.push(`<p${paragraphClass ? ` class="${paragraphClass}"` : ""}>${paragraphBody}</p>`);
     }
   }
 
@@ -3217,7 +3220,7 @@ function applyInlinePostStyles(root) {
     const toneColor = inlineParagraphToneColor(element);
     const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
-      element.setAttribute("style", `${colorBase}margin-top:8px;margin-bottom:22px;padding:15px 18px;border-radius:6px;background:${inlineParagraphBackground(element)};font-weight:600;`);
+      element.setAttribute("style", `${colorBase}margin-top:2px;margin-bottom:20px;background:transparent;font-weight:600;`);
     } else if (element.classList.contains("is-short-note")) {
       element.setAttribute("style", `${colorBase}font-weight:600;`);
     } else {
@@ -3232,6 +3235,9 @@ function applyInlinePostStyles(root) {
   });
   root.querySelectorAll(".preview-keyword").forEach((element) => {
     element.setAttribute("style", "color:#17483b;font-weight:800;");
+  });
+  root.querySelectorAll(".preview-highlight").forEach((element) => {
+    element.setAttribute("style", "padding:0 .14em;background:linear-gradient(transparent 58%, #fff0bd 58%);box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:2px;");
   });
   root.querySelectorAll("figcaption").forEach((element) => {
     element.setAttribute("style", "margin:0 auto;padding:10px 4px 0;color:#5f665f;font-size:14px;line-height:1.58;text-align:center;");
@@ -3249,12 +3255,6 @@ function inlineParagraphToneColor(element) {
   if (element.classList.contains("is-important")) return "#1e3d32";
   if (element.classList.contains("is-short-note")) return "#28483b";
   return "";
-}
-
-function inlineParagraphBackground(element) {
-  if (element.classList.contains("tone-menu")) return "#fbf6ef";
-  if (element.classList.contains("tone-place") || element.classList.contains("tone-atmosphere")) return "#f4f8f2";
-  return "#fbf8f1";
 }
 
 function downloadText(filename, text) {
