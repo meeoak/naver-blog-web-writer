@@ -290,7 +290,7 @@ function autoMatchPhotos(input, force = false) {
       caption = "메뉴판";
       note = photoNarrativeNote(role, caption, null, input);
     } else if (role === "drink") {
-      const menu = matchedMenuForPhoto(photo, input) || matchedMenuByVisualKey("drink", input);
+      const menu = matchedMenuForPhoto(photo, input);
       caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음료";
       note = photoNarrativeNote(role, caption, menu, input);
     } else if (role === "food") {
@@ -319,8 +319,8 @@ function inferPhotoRole(photo, index, total, input) {
   if (/sate|satay|udang|bakar|shrimp|food|dish|plate|사테|우당|새우|음식|요리|밥/.test(text)) return "food";
   if (/entrance|exterior|outside|입구|외관|간판/.test(text)) return "exterior";
   if (/interior|inside|table|seat|bar|내부|분위기|자리|조명|소품/.test(text)) return index === 0 ? "thumbnail" : "interior";
-  if (photo.analysis?.visualMenu === "drink") return "drink";
-  if (["sate", "udang", "food"].includes(photo.analysis?.visualMenu)) return "food";
+  if (photo.analysis?.visualRole === "drink") return "drink";
+  if (photo.analysis?.visualMenu === "mixed") return "food";
   if (photo.analysis?.visualRole) {
     if (photo.analysis.visualRole === "food") return "food";
     return index === 0 ? "thumbnail" : photo.analysis.visualRole;
@@ -458,16 +458,8 @@ function summarizePhotoPixels(data, size) {
   if (darkRatio > 0.62 && centerFoodColorRatio < 0.16) visualRole = "interior";
 
   if (visualRole === "food") {
-    if (centerOrangeRatio > 0.08 && centerOrangeRatio > centerBrownRatio * 0.85) {
-      visualMenu = "udang";
-      visualMenuConfidence = Math.min(0.88, 0.55 + centerOrangeRatio * 2);
-    } else if (centerBrownRatio > 0.16 || (centerFoodColorRatio > 0.32 && centerOrangeRatio < 0.08)) {
-      visualMenu = "sate";
-      visualMenuConfidence = Math.min(0.82, 0.5 + centerBrownRatio * 1.6);
-    } else {
-      visualMenu = "mixed";
-      visualMenuConfidence = 0.45;
-    }
+    visualMenu = "mixed";
+    visualMenuConfidence = 0.45;
   }
 
   if (centerDrinkToneRatio > 0.3 && centerOrangeRatio < 0.05 && avgSaturation < 0.32 && darkRatio < 0.35) {
@@ -551,8 +543,7 @@ function photoSceneLabel(photo) {
   if (photo.role === "menu") return "메뉴판";
   if (["thumbnail", "interior", "exterior", "body"].includes(photo.role) && photo.analysis?.visualRole !== "food") return "분위기";
   if (photo.analysis?.visualMenu === "mixed") return "음식 테이블";
-  if (photo.analysis?.visualMenuConfidence >= 0.86 && photo.analysis?.visualMenu === "sate") return "사테 후보";
-  if (photo.analysis?.visualMenuConfidence >= 0.86 && photo.analysis?.visualMenu === "udang") return "우당 후보";
+  if (photo.analysis?.visualMenuConfidence >= 0.86 && ["sate", "udang"].includes(photo.analysis?.visualMenu)) return "음식 후보";
   return "음식";
 }
 
@@ -837,7 +828,6 @@ function photoMatchesMenu(photo, menu) {
   if (/sate|사테/.test(menuText) && /sate|사테|꼬치/.test(haystack)) return true;
   if (/udang|우당|새우/.test(menuText) && /udang|우당|새우|shrimp/.test(haystack)) return true;
   if (/jahe|자헤|madu|마두|생강|꿀/.test(menuText) && /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack)) return true;
-  if (photo.analysis?.visualMenuConfidence >= 0.86 && menuMatchesVisualKey(menu, photo.analysis.visualMenu)) return true;
   return false;
 }
 
@@ -1444,8 +1434,12 @@ function photoNarrativeNote(role, caption, menu, input) {
     return "우당 바카르는 양념이 잘 배어 있는 구운 새우라서 밥이랑 같이 먹기 좋았어. 삼발은 조금씩 곁들이는 쪽이 내 입맛에는 더 잘 맞았어.";
   }
 
-  if (/jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(label) || role === "drink") {
+  if (/jahe|자헤|madu|마두|생강|꿀/.test(label)) {
     return "자헤 마두는 생강 향이 먼저 올라오고 뒤에 꿀 단맛이 남는 따뜻한 음료였어. 양념 진한 음식을 먹고 나서 마무리하기 괜찮았어.";
+  }
+
+  if (role === "drink") {
+    return "음식이랑 같이 마신 음료. 양념 있는 메뉴를 먹을 때 중간중간 마시기 괜찮았어.";
   }
 
   if (role === "food") {
