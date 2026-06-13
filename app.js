@@ -64,6 +64,7 @@ function bindEvents() {
   $("photoInput").addEventListener("change", handlePhotos);
   $("autoMatchPhotosBtn").addEventListener("click", autoMatchPhotosFromButton);
   $("photoDensityInput").addEventListener("change", generateAll);
+  $("photoCaptionModeInput").addEventListener("change", generateAll);
   $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
   $("saveVoiceBtn").addEventListener("click", saveVoicePreset);
   $("resetBtn").addEventListener("click", resetInputs);
@@ -80,6 +81,7 @@ function bindEvents() {
     refreshReports();
   });
   $("postEditor").addEventListener("input", debounce(refreshReports, 250));
+  $("postPreview").addEventListener("click", handlePreviewPhotoMove);
   $("brandInput").addEventListener("input", drawThumbnail);
   $("accentInput").addEventListener("input", drawThumbnail);
   $("thumbTitleInput").addEventListener("input", drawThumbnail);
@@ -117,6 +119,7 @@ function getInput() {
     brand: $("brandInput").value.trim() || "Ara in Indonesia",
     voice: $("voiceInput").value.trim(),
     photoDensity: $("photoDensityInput").value || "recommended",
+    photoCaptionMode: $("photoCaptionModeInput").value || "safe",
   };
 }
 
@@ -671,7 +674,7 @@ function makePhotoReflectionSection(input) {
   ];
   plan.forEach((photo) => {
     linesOut.push(photoMarker(photo));
-    const note = manualPhotoNote(photo);
+    const note = photoNoteForPost(photo, input);
     if (note) linesOut.push(note);
   });
   return linesOut;
@@ -695,7 +698,7 @@ function makeAtmosphereSection(input) {
     linesOut.push("");
     interiorPhotos.forEach((photo) => {
       linesOut.push(photoMarker(photo));
-      const note = manualPhotoNote(photo);
+      const note = photoNoteForPost(photo, input);
       if (note) linesOut.push(note);
     });
   }
@@ -798,7 +801,7 @@ function photoLinesForMenu(menu, input) {
 
   return matches.flatMap((photo) => [
     photoMarker(photo),
-    manualPhotoNote(photo),
+    photoNoteForPost(photo, input),
   ].filter(Boolean));
 }
 
@@ -812,7 +815,7 @@ function photoLinesForGeneralFood(input) {
 
   return matches.flatMap((photo) => [
     photoMarker(photo),
-    manualPhotoNote(photo),
+    photoNoteForPost(photo, input),
   ].filter(Boolean));
 }
 
@@ -832,6 +835,46 @@ function manualPhotoNote(photo) {
   const note = String(photo?.note || "").trim();
   if (!note || isGenericPhotoNote(note)) return "";
   return photo?.userEdited ? note : "";
+}
+
+function photoNoteForPost(photo, input) {
+  const manual = manualPhotoNote(photo);
+  if (manual) return manual;
+  const mode = input.photoCaptionMode || "safe";
+  if (mode === "none" || mode === "manual") return "";
+  return safePhotoNote(photo, input);
+}
+
+function safePhotoNote(photo, input) {
+  const place = shortPlace(input.place || input.topic || "이곳");
+  const role = photo?.role || "body";
+  const index = Number(photo?.index || 1);
+  const pick = (items) => items[(index - 1) % items.length];
+
+  if (role === "drink") {
+    return pick([
+      "음식이랑 같이 마시기 괜찮았던 음료. 양념 있는 메뉴를 먹을 때 중간중간 입을 정리해주는 느낌이 있었어.",
+      "메뉴가 조금 진하게 느껴질 때 같이 마시기 좋았어. 이런 음료가 하나 있으면 식사 흐름이 더 편해져.",
+    ]);
+  }
+
+  if (role === "menu") {
+    return "메뉴 이름이 낯설 수 있어서, 처음 방문한다면 먹어보고 싶은 메뉴를 미리 몇 개 정해두고 가는 게 편해.";
+  }
+
+  if (["thumbnail", "exterior", "interior", "body"].includes(role) && photo?.analysis?.visualRole !== "food") {
+    return pick([
+      `${place}는 조명이 따뜻해서 사진으로 봐도 분위기가 꽤 잘 남는 편이야.`,
+      "몰 안에 있는 식당인데도 내부 분위기가 차갑지 않아서, 앉아 있는 동안 편하게 느껴졌어.",
+      "이런 분위기 때문에 그냥 밥만 먹고 나오는 곳이라기보다, 잠깐 기분 전환하는 느낌도 있었어.",
+    ]);
+  }
+
+  return pick([
+    "이날 테이블에 올라온 음식들. 메뉴 하나만 단독으로 먹기보다 여러 가지를 같이 놓고 나눠 먹는 흐름이 괜찮았어.",
+    "소스가 있는 메뉴들이라 밥이랑 같이 먹기 좋았고, 처음 먹는 사람도 크게 어렵지 않을 조합이었어.",
+    "사진으로 남겨두니 그날 먹었던 메뉴 조합이 더 잘 기억나. 이런 식당은 여러 메뉴를 같이 시켜야 더 맛있는 것 같아.",
+  ]);
 }
 
 function photoMatchesMenu(photo, menu) {
@@ -1557,9 +1600,9 @@ function renderPostPreview(text, tags = []) {
       const photo = state.photos[photoIndex];
       const nextLine = (linesRaw[i + 1] || "").trim();
       const caption = photoMatch[2] || "";
-      const note = caption && shouldUseLineAsPhotoNote(nextLine) ? nextLine : "";
+      const note = lineBelongsToPhotoNote(nextLine, photoIndex + 1, line) ? nextLine : "";
       if (note) i += 1;
-      blocks.push(renderPreviewPhoto(photo, caption, note));
+      blocks.push(renderPreviewPhoto(photo, caption, note, photoIndex + 1));
       continue;
     }
 
@@ -1609,17 +1652,33 @@ function shouldUseLineAsPhotoNote(line) {
   return !isPreviewHeading(line) && !isPreviewSubheading(line);
 }
 
+function lineBelongsToPhotoNote(line, photoNumber, markerLine = "") {
+  if (!shouldUseLineAsPhotoNote(line)) return false;
+  const photo = state.photos[photoNumber - 1];
+  const input = getInput();
+  const expected = photo ? photoNoteForPost({ ...photo, index: photoNumber }, input) : "";
+  if (expected && normalizePreviewLine(line) === normalizePreviewLine(expected)) return true;
+  const marker = markerLine.match(/^\[사진\s+\d+(?::\s*(.+?))?\]$/);
+  return Boolean(marker?.[1]);
+}
+
 function normalizePreviewLine(line) {
   return String(line || "").replace(/\s+/g, " ").trim();
 }
 
-function renderPreviewPhoto(photo, caption, note) {
+function renderPreviewPhoto(photo, caption, note, photoNumber = 0) {
   const className = previewPhotoClass(photo);
   const safeCaption = String(caption || "").trim();
   const safeNote = String(note || "").trim();
   const altText = safeCaption || `${getInput().place || getInput().topic || "블로그"} 사진`;
+  const controls = photoNumber ? `
+    <div class="photo-move-controls" aria-label="사진 위치 이동">
+      <button type="button" data-photo-move="up" data-photo-number="${photoNumber}">위로</button>
+      <button type="button" data-photo-move="down" data-photo-number="${photoNumber}">아래로</button>
+    </div>
+  ` : "";
   if (!photo?.dataUrl) {
-    return `<figure class="${className} is-missing"><div>${escapeHtml(safeCaption || "사진")}</div>${safeNote ? `<figcaption>${escapeHtml(safeNote)}</figcaption>` : ""}</figure>`;
+    return `<figure class="${className} is-missing">${controls}<div>${escapeHtml(safeCaption || "사진")}</div>${safeNote ? `<figcaption>${escapeHtml(safeNote)}</figcaption>` : ""}</figure>`;
   }
   const captionHtml = safeCaption || safeNote
     ? `
@@ -1631,10 +1690,94 @@ function renderPreviewPhoto(photo, caption, note) {
     : "";
   return `
     <figure class="${className}">
+      ${controls}
       <img src="${photo.dataUrl}" alt="${escapeHtml(altText)}">
       ${captionHtml}
     </figure>
   `;
+}
+
+function handlePreviewPhotoMove(event) {
+  const button = event.target.closest("[data-photo-move]");
+  if (!button) return;
+  const photoNumber = Number(button.dataset.photoNumber);
+  const direction = button.dataset.photoMove;
+  if (!photoNumber || !direction) return;
+  movePhotoBlock(photoNumber, direction);
+}
+
+function movePhotoBlock(photoNumber, direction) {
+  const editor = $("postEditor");
+  const lines = editor.value.split(/\r?\n/);
+  const start = lines.findIndex((line) => new RegExp(`^\\[사진\\s+${photoNumber}(?::.*)?\\]$`).test(line.trim()));
+  if (start < 0) return;
+  const end = photoBlockEnd(lines, start);
+  const photoBlock = lines.slice(start, end);
+
+  if (direction === "up") {
+    const prev = previousBlockBounds(lines, start);
+    if (!prev) return;
+    const nextLines = [
+      ...lines.slice(0, prev.start),
+      ...photoBlock,
+      ...lines.slice(prev.end, start),
+      ...lines.slice(prev.start, prev.end),
+      ...lines.slice(end),
+    ];
+    editor.value = nextLines.join("\n");
+  } else {
+    const next = nextBlockBounds(lines, end);
+    if (!next) return;
+    const nextLines = [
+      ...lines.slice(0, start),
+      ...lines.slice(next.start, next.end),
+      ...lines.slice(end, next.start),
+      ...photoBlock,
+      ...lines.slice(next.end),
+    ];
+    editor.value = nextLines.join("\n");
+  }
+
+  refreshReports();
+}
+
+function photoBlockEnd(lines, start) {
+  const markerLine = (lines[start] || "").trim();
+  const match = markerLine.match(/^\[사진\s+(\d+)(?::\s*(.+?))?\]$/);
+  if (!match) return start + 1;
+  const photoNumber = Number(match[1]);
+  const nextLine = (lines[start + 1] || "").trim();
+  return lineBelongsToPhotoNote(nextLine, photoNumber, markerLine) ? start + 2 : start + 1;
+}
+
+function previousBlockBounds(lines, start) {
+  let index = start - 1;
+  while (index >= 0 && !lines[index].trim()) index -= 1;
+  if (index < 0) return null;
+  return blockBoundsAt(lines, index);
+}
+
+function nextBlockBounds(lines, end) {
+  let index = end;
+  while (index < lines.length && !lines[index].trim()) index += 1;
+  if (index >= lines.length) return null;
+  return blockBoundsAt(lines, index);
+}
+
+function blockBoundsAt(lines, index) {
+  const current = (lines[index] || "").trim();
+  const currentMarker = current.match(/^\[사진\s+(\d+)(?::\s*(.+?))?\]$/);
+  if (currentMarker) {
+    return { start: index, end: photoBlockEnd(lines, index) };
+  }
+
+  const previous = (lines[index - 1] || "").trim();
+  const previousMarker = previous.match(/^\[사진\s+(\d+)(?::\s*(.+?))?\]$/);
+  if (previousMarker && lineBelongsToPhotoNote(current, Number(previousMarker[1]), previous)) {
+    return { start: index - 1, end: index + 1 };
+  }
+
+  return { start: index, end: index + 1 };
 }
 
 function previewPhotoClass(photo) {

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-photo-story-flow">
+  <link rel="stylesheet" href="styles.css?v=20260613-movable-photo-captions">
 </head>
 <body>
   <main class="app-shell">
@@ -103,6 +103,14 @@ Casa Residence에서 가까워서 들르기 편함
               <option value="medium">보통</option>
               <option value="large">크게</option>
               <option value="full">가득</option>
+            </select>
+          </label>
+          <label>
+            <span>사진 설명</span>
+            <select id="photoCaptionModeInput">
+              <option value="safe" selected>간단 설명</option>
+              <option value="manual">내 메모만</option>
+              <option value="none">숨김</option>
             </select>
           </label>
         </div>
@@ -214,6 +222,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260613-photo-story-flow"></script>
+  <script src="app.js?v=20260613-movable-photo-captions"></script>
 </body>
 </html>
