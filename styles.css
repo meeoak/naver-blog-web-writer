@@ -107,7 +107,7 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 12px;
+  margin: 0 auto 12px;
 }
 
 label,
@@ -346,81 +346,145 @@ textarea {
 
 .post-preview {
   width: 100%;
+  max-width: 980px;
   min-height: 520px;
-  max-height: 68vh;
-  overflow: auto;
+  overflow: visible;
   margin-bottom: 12px;
-  padding: 22px;
+  padding: 36px 30px 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: #fffdf9;
   box-shadow: var(--shadow);
-  color: #202124;
+  color: #2f332f;
   font-family: Arial, "Malgun Gothic", sans-serif;
-  font-size: 16px;
-  line-height: 1.72;
+  font-size: 17px;
+  line-height: 1.88;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.post-preview > * {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .post-preview h1 {
-  margin: 0 0 28px;
+  margin: 0 auto 34px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e4ded1;
   color: var(--sage);
-  font-size: 25px;
-  line-height: 1.35;
+  font-size: 28px;
+  line-height: 1.42;
+  letter-spacing: 0;
 }
 
 .post-preview h2 {
-  margin: 34px 0 14px;
-  color: var(--sage);
-  font-size: 21px;
-  line-height: 1.4;
+  margin: 48px auto 18px;
+  padding: 2px 0 2px 13px;
+  border-left: 4px solid var(--gold);
+  color: #244735;
+  font-size: 23px;
+  line-height: 1.45;
+  letter-spacing: 0;
 }
 
 .post-preview h3 {
-  margin: 28px 0 10px;
-  color: #1f3328;
-  font-size: 18px;
+  margin: 34px auto 12px;
+  color: #263b30;
+  font-size: 19px;
+  line-height: 1.5;
+  letter-spacing: 0;
 }
 
 .post-preview p {
-  margin: 0 0 12px;
+  margin: 0 auto 15px;
+}
+
+.post-preview a {
+  color: var(--teal);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 .post-preview ul {
-  margin: 0 0 18px;
-  padding-left: 18px;
+  margin: 2px auto 24px;
+  padding: 12px 0 12px 28px;
+  border-left: 2px solid #d9d1c0;
+  color: #353a35;
+  background: #fbf8f1;
+}
+
+.post-preview li {
+  margin: 3px 0;
+  line-height: 1.72;
 }
 
 .preview-photo {
-  margin: 18px 0 22px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-  background: #fafafa;
+  width: min(100%, 640px);
+  margin: 26px auto 34px;
+  border: 0;
+  background: transparent;
+}
+
+.preview-photo.is-wide {
+  width: min(100%, 760px);
+}
+
+.preview-photo.is-medium {
+  width: min(100%, 640px);
+}
+
+.preview-photo.is-compact {
+  width: min(100%, 520px);
+}
+
+.preview-photo.is-portrait {
+  width: min(100%, 460px);
 }
 
 .preview-photo img {
   display: block;
-  width: 100%;
-  max-height: 520px;
+  width: auto;
+  max-width: 100%;
+  max-height: 420px;
+  height: auto;
+  margin: 0 auto;
   object-fit: contain;
+  border-radius: 6px;
   background: #f4f1ea;
+  box-shadow: 0 12px 28px rgba(25, 28, 33, 0.14);
+}
+
+.preview-photo.is-wide img {
+  max-height: 390px;
+}
+
+.preview-photo.is-compact img {
+  max-height: 360px;
+}
+
+.preview-photo.is-portrait img {
+  max-height: 540px;
 }
 
 .preview-photo figcaption {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
-  color: #384139;
+  padding: 10px 4px 0;
+  color: #676b65;
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .preview-photo figcaption strong {
-  color: var(--sage);
+  color: #7a6a4f;
+  font-size: 13px;
 }
 
 .preview-photo.is-missing {
   padding: 18px;
-  border-style: dashed;
+  border: 1px dashed var(--line);
 }
 
 .preview-tags {
@@ -532,6 +596,45 @@ textarea {
 
   .tab-bar {
     overflow-x: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .work-pane {
+    padding: 14px;
+  }
+
+  .post-preview {
+    padding: 26px 16px 34px;
+    font-size: 16px;
+    line-height: 1.82;
+  }
+
+  .post-preview h1 {
+    font-size: 24px;
+  }
+
+  .post-preview h2 {
+    font-size: 20px;
+  }
+
+  .post-preview h3 {
+    font-size: 18px;
+  }
+
+  .preview-photo,
+  .preview-photo.is-wide,
+  .preview-photo.is-medium,
+  .preview-photo.is-compact,
+  .preview-photo.is-portrait {
+    width: 100%;
+  }
+
+  .preview-photo img,
+  .preview-photo.is-wide img,
+  .preview-photo.is-compact img,
+  .preview-photo.is-portrait img {
+    max-height: 420px;
   }
 }
 

@@ -154,6 +154,9 @@ function handlePhotos(event) {
         id: makeId(),
         name: file.name,
         dataUrl: reader.result,
+        width: 0,
+        height: 0,
+        aspectRatio: 1,
         caption: autoCaption(file.name, state.photos.length),
         note: "",
         role: autoRole(file.name, state.photos.length),
@@ -263,14 +266,17 @@ function autoMatchPhotos(input, force = false) {
 }
 
 function inferPhotoRole(photo, index, total, input) {
-  const text = `${photo.name} ${photo.caption} ${photo.note}`.toLowerCase();
+  if (photo.userEdited && photo.role && photo.role !== "body") return photo.role;
+  const fileText = `${photo.name || ""}`.toLowerCase();
+  const userText = `${photo.caption || ""} ${photo.note || ""}`.toLowerCase();
+  const text = photo.userEdited ? `${fileText} ${userText}` : fileText;
   if (/menu|메뉴판/.test(text)) return "menu";
   if (/jahe|madu|drink|beverage|음료|자헤|마두|생강|꿀|tea|차/.test(text)) return "drink";
   if (/sate|satay|udang|bakar|shrimp|food|dish|plate|사테|우당|새우|음식|요리|밥/.test(text)) return "food";
   if (/entrance|exterior|outside|입구|외관|간판/.test(text)) return "exterior";
   if (/interior|inside|table|seat|bar|내부|분위기|자리|조명|소품/.test(text)) return index === 0 ? "thumbnail" : "interior";
   if (photo.analysis?.visualRole) return index === 0 ? "thumbnail" : photo.analysis.visualRole;
-  if (photo.role && photo.role !== "body") return photo.role;
+  if (!photo.autoMatched && photo.role && photo.role !== "body") return photo.role;
   if (index === 0) return "thumbnail";
   if (index < Math.min(4, total)) return "interior";
   if (input.menus.length) return "food";
@@ -293,6 +299,9 @@ function analyzePhotoVisual(photo) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      photo.width = img.naturalWidth || img.width || 0;
+      photo.height = img.naturalHeight || img.height || 0;
+      photo.aspectRatio = photo.width && photo.height ? photo.width / photo.height : 1;
       try {
         const canvas = document.createElement("canvas");
         const size = 48;
@@ -1338,11 +1347,12 @@ function shouldUseLineAsPhotoNote(line) {
 }
 
 function renderPreviewPhoto(photo, caption, note) {
+  const className = previewPhotoClass(photo);
   if (!photo?.dataUrl) {
-    return `<figure class="preview-photo is-missing"><div>${escapeHtml(caption)}</div>${note ? `<figcaption>${escapeHtml(note)}</figcaption>` : ""}</figure>`;
+    return `<figure class="${className}"><div>${escapeHtml(caption)}</div>${note ? `<figcaption>${escapeHtml(note)}</figcaption>` : ""}</figure>`;
   }
   return `
-    <figure class="preview-photo">
+    <figure class="${className}">
       <img src="${photo.dataUrl}" alt="${escapeHtml(caption)}">
       <figcaption>
         <strong>${escapeHtml(caption)}</strong>
@@ -1350,6 +1360,23 @@ function renderPreviewPhoto(photo, caption, note) {
       </figcaption>
     </figure>
   `;
+}
+
+function previewPhotoClass(photo) {
+  const classes = ["preview-photo"];
+  if (!photo?.dataUrl) classes.push("is-missing");
+  const role = photo?.role || "body";
+  if (["thumbnail", "exterior", "interior", "body"].includes(role)) {
+    classes.push("is-wide");
+  } else if (["drink", "menu", "map"].includes(role)) {
+    classes.push("is-compact");
+  } else {
+    classes.push("is-medium");
+  }
+  if (photo?.width && photo?.height && photo.height > photo.width * 1.15) {
+    classes.push("is-portrait");
+  }
+  return classes.join(" ");
 }
 
 function isPreviewHeading(line) {
