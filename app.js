@@ -3207,20 +3207,20 @@ async function copyStyledPost() {
 
 function applyInlinePostStyles(root) {
   root.querySelectorAll("h1").forEach((element) => {
-    element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.38;font-weight:800;letter-spacing:0;");
+    element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.36;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h2").forEach((element) => {
-    element.setAttribute("style", "margin:52px 0 20px;padding:0 0 11px;border-bottom:1px solid #e0d4b9;color:#173f36;font-size:24px;line-height:1.42;font-weight:800;letter-spacing:0;");
+    element.setAttribute("style", "margin:44px 0 18px;padding:0 0 11px;border-bottom:1px solid #e0d4b9;color:#173f36;font-size:24px;line-height:1.34;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h3").forEach((element) => {
-    element.setAttribute("style", "margin:32px 0 13px;color:#253f34;font-size:19px;line-height:1.52;font-weight:750;letter-spacing:0;");
+    element.setAttribute("style", "margin:28px 0 12px;color:#253f34;font-size:19px;line-height:1.42;font-weight:750;letter-spacing:0;");
   });
   root.querySelectorAll("p").forEach((element) => {
-    const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.94;letter-spacing:0;";
+    const base = "margin:0 0 17px;color:#202824;font-size:16.5px;line-height:1.86;letter-spacing:0;";
     const toneColor = inlineParagraphToneColor(element);
     const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
-      element.setAttribute("style", `${colorBase}margin-top:2px;margin-bottom:20px;background:transparent;font-weight:600;`);
+      element.setAttribute("style", `${colorBase}margin-top:0;margin-bottom:17px;background:transparent;font-weight:600;`);
     } else if (element.classList.contains("is-short-note")) {
       element.setAttribute("style", `${colorBase}font-weight:600;`);
     } else {
@@ -3228,10 +3228,10 @@ function applyInlinePostStyles(root) {
     }
   });
   root.querySelectorAll("ul").forEach((element) => {
-    element.setAttribute("style", "margin:4px 0 28px;padding:14px 18px 14px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.85;");
+    element.setAttribute("style", "margin:4px 0 20px;padding:13px 18px 13px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.86;");
   });
   root.querySelectorAll("li").forEach((element) => {
-    element.setAttribute("style", "margin:5px 0;line-height:1.78;");
+    element.setAttribute("style", "margin:4px 0;line-height:1.86;");
   });
   root.querySelectorAll(".preview-keyword").forEach((element) => {
     element.setAttribute("style", "color:#17483b;font-weight:800;");
