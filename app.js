@@ -93,7 +93,7 @@ function bindEvents() {
   $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
   $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
   $("aiSearchReviewBtn").addEventListener("click", runAIWebReview);
-  $("polishPostBtn").addEventListener("click", polishPostLayout);
+  if ($("polishPostBtn")) $("polishPostBtn").addEventListener("click", polishPostLayout);
   $("toggleEditorBtn").addEventListener("click", toggleDirectPreviewEdit);
   $("savePreviewEditBtn").addEventListener("click", () => savePreviewEdits());
   $("fixAiBtn").addEventListener("click", fixAiSmell);
