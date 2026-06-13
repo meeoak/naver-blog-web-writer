@@ -392,7 +392,7 @@ textarea {
   color: #202124;
   font-family: Arial, "Malgun Gothic", sans-serif;
   font-size: 16px;
-  line-height: 1.7;
+  line-height: 1.82;
 }
 
 .post-preview {
@@ -401,15 +401,15 @@ textarea {
   min-height: 520px;
   overflow: visible;
   margin-bottom: 12px;
-  padding: 42px 34px 52px;
+  padding: 40px 34px 50px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf9;
   box-shadow: var(--shadow);
   color: #292f2b;
   font-family: Arial, "Malgun Gothic", sans-serif;
-  font-size: 17px;
-  line-height: 1.96;
+  font-size: 16.5px;
+  line-height: 1.84;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
@@ -421,38 +421,38 @@ textarea {
 }
 
 .post-preview h1 {
-  margin: 0 auto 38px;
-  padding-bottom: 20px;
+  margin: 0 auto 34px;
+  padding-bottom: 18px;
   border-bottom: 1px solid #e4ded1;
   color: #244735;
-  font-size: 30px;
-  line-height: 1.42;
+  font-size: 29px;
+  line-height: 1.4;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .post-preview h2 {
-  margin: 54px auto 20px;
-  padding: 4px 0 4px 15px;
+  margin: 46px auto 16px;
+  padding: 3px 0 3px 14px;
   border-left: 5px solid var(--gold);
   color: #244735;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1.45;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .post-preview h3 {
-  margin: 36px auto 14px;
+  margin: 30px auto 12px;
   color: #263b30;
-  font-size: 20px;
+  font-size: 18.5px;
   line-height: 1.5;
   font-weight: 750;
   letter-spacing: 0;
 }
 
 .post-preview p {
-  margin: 0 auto 18px;
+  margin: 0 auto 15px;
 }
 
 .post-preview a {
@@ -462,22 +462,22 @@ textarea {
 }
 
 .post-preview ul {
-  margin: 2px auto 24px;
-  padding: 12px 0 12px 28px;
+  margin: 2px auto 22px;
+  padding: 11px 0 11px 26px;
   border-left: 2px solid #d9d1c0;
   color: #353a35;
   background: #fbf8f1;
 }
 
 .post-preview li {
-  margin: 3px 0;
-  line-height: 1.72;
+  margin: 4px 0;
+  line-height: 1.68;
 }
 
 .preview-photo {
   position: relative;
   width: min(100%, 640px);
-  margin: 26px auto 34px;
+  margin: 30px auto 36px;
   border: 0;
   background: transparent;
 }
@@ -557,10 +557,10 @@ textarea {
   gap: 4px;
   max-width: 92%;
   margin: 0 auto;
-  padding: 11px 4px 0;
+  padding: 10px 4px 0;
   color: #5f665f;
   font-size: 14px;
-  line-height: 1.62;
+  line-height: 1.58;
   text-align: center;
 }
 
@@ -743,19 +743,28 @@ textarea {
   .post-preview {
     padding: 26px 16px 34px;
     font-size: 16px;
-    line-height: 1.82;
+    line-height: 1.8;
   }
 
   .post-preview h1 {
     font-size: 24px;
+    margin-bottom: 28px;
   }
 
   .post-preview h2 {
     font-size: 20px;
+    margin-top: 38px;
+    margin-bottom: 14px;
   }
 
   .post-preview h3 {
     font-size: 18px;
+    margin-top: 26px;
+    margin-bottom: 10px;
+  }
+
+  .post-preview p {
+    margin-bottom: 14px;
   }
 
   .preview-photo,

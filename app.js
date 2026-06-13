@@ -2717,7 +2717,7 @@ async function copyStyledPost() {
   refreshReports();
   const preview = $("postPreview");
   const html = `
-    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #2f332f; font-size: 17px; line-height: 1.88;">
+    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
       ${preview.innerHTML}
     </article>
   `;
