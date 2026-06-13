@@ -572,6 +572,38 @@ textarea {
   font-weight: 650;
 }
 
+.post-preview.is-polished p.tone-menu {
+  color: #3d3328;
+}
+
+.post-preview.is-polished p.tone-atmosphere {
+  color: #2f4138;
+}
+
+.post-preview.is-polished p.tone-place {
+  color: #24483b;
+}
+
+.post-preview.is-polished p.tone-tip {
+  color: #5b4930;
+}
+
+.post-preview.is-polished p.is-important.tone-menu {
+  background: #fbf6ef;
+  border-left-color: #c08b58;
+}
+
+.post-preview.is-polished p.is-important.tone-place,
+.post-preview.is-polished p.is-important.tone-atmosphere {
+  background: #f4f8f2;
+  border-left-color: #8eae8a;
+}
+
+.post-preview.is-polished p.is-important.tone-tip {
+  background: #fbf8f1;
+  border-left-color: #c8ad67;
+}
+
 .preview-keyword {
   color: #17483b;
   font-weight: 800;

@@ -828,6 +828,10 @@ function makeOpenAIPrompt(input, aiPhotos) {
 - 사진 설명은 사진 바로 아래에 1문장으로 붙인다.
 - 제목은 검색어가 들어가되 너무 광고처럼 보이지 않게 쓴다.
 - 소제목은 7~10개 정도로 나누고, 각 소제목 아래 문단은 2~5문단으로 정리한다.
+- 소제목은 반드시 본문 중간중간에 독립된 한 줄로 넣는다. 마크다운 # 기호는 쓰지 않는다.
+- 소제목은 10~22자 정도의 짧은 말투로 쓰고, 마침표로 끝내지 않는다.
+- 소제목 예시: 다시 가도 좋았던 이유 / 방문한 날의 기록 / 분위기와 위치 / 먹어본 메뉴 / 예약과 방문 팁 / 마무리하면
+- 독자가 지루하지 않도록 짧은 강조 문장과 긴 설명 문단을 섞는다.
 - 단락 사이에는 빈 줄을 넣어 모바일에서 읽기 쉽게 만든다.
 
 [입력 정보]
@@ -857,7 +861,8 @@ ${photoNumbers}
 - 한국어 중심으로 쓰고, 필요한 곳에 Pesta Kebun, Kokas, Kota Kasablanka 같은 검색어를 자연스럽게 넣는다.
 - 글은 최소 4500자 이상을 목표로 한다.
 - 소제목은 너무 과장하지 말고 자연스럽게 쓴다.
-- 소제목은 한 줄에 하나씩 쓰고, 바로 다음 줄부터 본문을 쓴다.
+- 소제목은 한 줄에 하나씩 쓰고, 바로 다음 줄부터 본문을 쓴다. 소제목 없는 긴 문단 덩어리를 만들지 않는다.
+- 메뉴, 위치, 예약/대기, 결론 파트는 반드시 각각 소제목을 둔다.
 - 사진을 넣을 위치에는 반드시 [사진 1: 짧은 캡션] 형식을 사용한다.
 - [사진 N: 캡션] 바로 다음 줄에는 사진을 설명하는 자연스러운 1문장을 쓴다.
 - 사진 번호는 제공된 사진 번호만 사용한다.
@@ -896,14 +901,15 @@ function parseOpenAIJson(text) {
 
 function applyOpenAIResult(result, input) {
   disableDirectPreviewEdit();
-  state.isPolished = false;
   const title = String(result.title || "").trim();
   const post = String(result.naver_post || "").trim();
   if (!post) throw new Error("AI가 원고 본문을 보내지 않았어요.");
+  const polishedPost = buildPolishedPostText(post);
 
   const tags = dietTags((result.tags || []).map((tag) => String(tag).trim()).filter(Boolean), 18);
   state.tags = tags.length ? tags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`) : makeTags(input);
-  state.naverPost = post;
+  state.naverPost = polishedPost;
+  state.isPolished = true;
   state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
   state.titleCandidates = unique([
     title,
@@ -2169,14 +2175,24 @@ function renderPostPreview(text, tags = []) {
 
 function previewParagraphClass(line) {
   const text = String(line || "");
+  const classes = [];
   if (text.length <= 46 && /(좋았|기억|추천|괜찮|편해|무난|대기|제일|다시|가까운|장점)/.test(text)) {
-    return "is-important";
+    classes.push("is-important");
   }
   if (/(이날 제일|운 좋게|대기 없이|다시 가도|한국인 입맛|실패하지|추천하고 싶은|기억에 남)/.test(text)) {
-    return "is-important";
+    classes.push("is-important");
   }
-  if (text.length < 34) return "is-short-note";
-  return "";
+  if (text.length < 34) classes.push("is-short-note");
+  if (/(사테|Sate|우당|Udang|자헤|Jahe|메뉴|음식|맛|소스|양념|밥|주문|먹었|음료)/i.test(text)) {
+    classes.push("tone-menu");
+  } else if (/(분위기|내부|인테리어|조명|테이블|자리|따뜻|빈티지|예쁜)/i.test(text)) {
+    classes.push("tone-atmosphere");
+  } else if (/(위치|Kokas|코카스|Casa Residence|가까워|몰 안|입구|이동|찾기)/i.test(text)) {
+    classes.push("tone-place");
+  } else if (/(예약|대기|피크|주말|시간|기다|방문 팁|팁)/i.test(text)) {
+    classes.push("tone-tip");
+  }
+  return unique(classes).join(" ");
 }
 
 function formatPreviewInline(text) {
@@ -2354,16 +2370,23 @@ function previewPhotoClass(photo) {
 }
 
 function isPreviewHeading(line) {
-  return line.endsWith("는 이런 곳이야") || [
+  const text = String(line || "").trim();
+  if (!text || text.length > 34) return false;
+  if (/^\[사진|^#|^(Q\.|A\.)|^(·|-)\s/.test(text)) return false;
+  if (/[.!?。]$/.test(text)) return false;
+  return text.endsWith("는 이런 곳이야") || [
     "다시 가도 좋았던 이유",
     "방문한 날의 기록",
+    "분위기와 위치",
     "분위기가 먼저 예쁜 곳",
     "방문해서 먹은 메뉴",
+    "먹어본 메뉴",
     "예약과 방문 팁",
     "방문 전 자주 묻는 질문",
     "위치와 이동 팁",
+    "마무리하면",
     "결론은,, 다시 갈 만한 곳",
-  ].includes(line);
+  ].includes(text) || /(이유|기록|곳|메뉴|분위기|후기|팁|예약|위치|이동|FAQ|정리|결론|맛|추천|방문|마무리)/.test(text);
 }
 
 function isPreviewSubheading(line) {
@@ -2521,7 +2544,20 @@ async function polishPostLayout() {
   setAiStatus("글 꾸미기 중입니다. 제목, 소제목, 강조 문장과 행간을 정리하고 있어요.");
   await delay(700);
 
-  let text = $("postEditor").value || "";
+  $("postEditor").value = buildPolishedPostText($("postEditor").value || "");
+  state.isPolished = true;
+  refreshReports();
+  disableDirectPreviewEdit();
+  if (button) {
+    button.disabled = false;
+    button.classList.remove("is-busy");
+    button.textContent = "글 꾸미기";
+  }
+  setAiStatus("글 꾸미기 완료. 빠진 소제목을 보강하고, 강조색, 굵기, 글자 크기, 행간을 정리했어.");
+}
+
+function buildPolishedPostText(rawText) {
+  let text = String(rawText || "");
   text = text
     .replace(/```(?:markdown|html|text)?/gi, "")
     .replace(/```/g, "")
@@ -2564,16 +2600,103 @@ async function polishPostLayout() {
     polished.push(line);
   });
 
-  $("postEditor").value = polished.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  state.isPolished = true;
-  refreshReports();
-  disableDirectPreviewEdit();
-  if (button) {
-    button.disabled = false;
-    button.classList.remove("is-busy");
-    button.textContent = "글 꾸미기";
+  return ensureReadableSectionHeadings(polished).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function ensureReadableSectionHeadings(lines) {
+  const cleanLines = lines.map((line) => String(line || "").trim());
+  const contentLines = cleanLines.filter(Boolean);
+  if (contentLines.length <= 4) return cleanLines;
+
+  const existingHeadingCount = contentLines.slice(1).filter((line, index) => isPolishHeading(line, index + 1)).length;
+  const shouldAddMoreHeadings = existingHeadingCount < 4;
+  const output = [];
+  let firstLineHandled = false;
+  let activeHeading = "";
+  const usedHeadings = new Set();
+
+  cleanLines.forEach((line, index) => {
+    if (!line) {
+      pushBlank(output);
+      return;
+    }
+
+    if (!firstLineHandled) {
+      output.push(line);
+      pushBlank(output);
+      firstLineHandled = true;
+      return;
+    }
+
+    if (/^(·|-)\s/.test(line) && shouldAddMoreHeadings && !activeHeading) {
+      activeHeading = "다시 가도 좋았던 이유";
+      usedHeadings.add(activeHeading);
+      pushBlank(output);
+      output.push(activeHeading);
+      pushBlank(output);
+    }
+
+    if (isPostStructureLine(line, index)) {
+      if (isPolishHeading(line, index)) {
+        activeHeading = line;
+        usedHeadings.add(line);
+      }
+      pushBlank(output);
+      output.push(line);
+      if (isPolishHeading(line, index) || line.startsWith("#")) pushBlank(output);
+      return;
+    }
+
+    if (shouldAddMoreHeadings) {
+      const nextHeading = suggestSectionHeading(line, activeHeading, output);
+      if (nextHeading && nextHeading !== activeHeading && !usedHeadings.has(nextHeading)) {
+        pushBlank(output);
+        output.push(nextHeading);
+        pushBlank(output);
+        activeHeading = nextHeading;
+        usedHeadings.add(nextHeading);
+      }
+    }
+
+    output.push(line);
+  });
+
+  return output;
+}
+
+function isPostStructureLine(line, index) {
+  return /^\[사진\s+\d+(?::.*)?\]$/.test(line)
+    || /^#/.test(line)
+    || /^(Q\.|A\.)/.test(line)
+    || /^(·|-)\s/.test(line)
+    || isPolishHeading(line, index);
+}
+
+function suggestSectionHeading(line, activeHeading, output) {
+  const text = String(line || "");
+  if (!text || /^\[사진\s+\d+/.test(text) || /^#/.test(text) || /^(Q\.|A\.)/.test(text)) return "";
+  if (/^(·|-)\s/.test(text)) return activeHeading || "다시 가도 좋았던 이유";
+
+  const lastUseful = [...output].reverse().find(Boolean) || "";
+  if (isPolishHeading(lastUseful, 1)) return "";
+
+  if (/(사테|Sate|우당|Udang|자헤|Jahe|메뉴|음식|맛|소스|양념|밥|주문|먹었|먹은|마셨|음료)/i.test(text)) {
+    return "먹어본 메뉴";
   }
-  setAiStatus("글 꾸미기 완료. 제목, 소제목, 강조색, 굵기, 행간을 최종 포스팅 느낌으로 정리했어.");
+  if (/(분위기|내부|인테리어|조명|테이블|자리|따뜻|빈티지|예쁜|몰 안|Kokas|코카스|Casa Residence|가까워|위치|입구|이동|찾기)/i.test(text)) {
+    return "분위기와 위치";
+  }
+  if (/(예약|대기|피크|주말|시간|기다|방문 팁|팁|가고 싶다고 바로|사람이 많|자리)/i.test(text)) {
+    return "예약과 방문 팁";
+  }
+  if (/(결론|마무리|다시 갈|다시 가도|추천|괜찮|갈 만|실패하지|데려가)/i.test(text)) {
+    return "마무리하면";
+  }
+  if (/(20\d{2}|방문|퇴근|저녁|점심|이날|들렀|앉았|먹고 들어가|운 좋게|기록)/i.test(text)) {
+    return "방문한 날의 기록";
+  }
+  if (!activeHeading) return "방문한 날의 기록";
+  return "";
 }
 
 function pushBlank(lines) {
@@ -2585,7 +2708,7 @@ function isPolishHeading(line, index) {
   if (/^\[사진|^#|^(Q\.|A\.)|^(·|-)\s/.test(line)) return false;
   if (index === 0) return true;
   if (/[.!?。]$/.test(line)) return false;
-  return /(이유|기록|곳|메뉴|분위기|후기|팁|예약|위치|이동|FAQ|정리|결론|맛|추천|방문|사진)/.test(line);
+  return /(이유|기록|곳|메뉴|분위기|후기|팁|예약|위치|이동|FAQ|정리|결론|맛|추천|방문|마무리)/.test(line);
 }
 
 function setEditorVisible(visible) {
@@ -3091,12 +3214,14 @@ function applyInlinePostStyles(root) {
   });
   root.querySelectorAll("p").forEach((element) => {
     const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.94;letter-spacing:0;";
+    const toneColor = inlineParagraphToneColor(element);
+    const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
-      element.setAttribute("style", `${base}padding:12px 14px;border-left:4px solid #c8ad67;background:#fbf8f1;color:#1e3d32;font-weight:650;`);
+      element.setAttribute("style", `${colorBase}padding:12px 14px;border-left:4px solid ${inlineParagraphAccentColor(element)};background:${inlineParagraphBackground(element)};font-weight:650;`);
     } else if (element.classList.contains("is-short-note")) {
-      element.setAttribute("style", `${base}color:#28483b;font-weight:600;`);
+      element.setAttribute("style", `${colorBase}font-weight:600;`);
     } else {
-      element.setAttribute("style", base);
+      element.setAttribute("style", colorBase);
     }
   });
   root.querySelectorAll("ul").forEach((element) => {
@@ -3114,6 +3239,28 @@ function applyInlinePostStyles(root) {
   root.querySelectorAll("img").forEach((element) => {
     element.setAttribute("style", "display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px;");
   });
+}
+
+function inlineParagraphToneColor(element) {
+  if (element.classList.contains("tone-menu")) return "#3d3328";
+  if (element.classList.contains("tone-atmosphere")) return "#2f4138";
+  if (element.classList.contains("tone-place")) return "#24483b";
+  if (element.classList.contains("tone-tip")) return "#5b4930";
+  if (element.classList.contains("is-important")) return "#1e3d32";
+  if (element.classList.contains("is-short-note")) return "#28483b";
+  return "";
+}
+
+function inlineParagraphAccentColor(element) {
+  if (element.classList.contains("tone-menu")) return "#c08b58";
+  if (element.classList.contains("tone-place") || element.classList.contains("tone-atmosphere")) return "#8eae8a";
+  return "#c8ad67";
+}
+
+function inlineParagraphBackground(element) {
+  if (element.classList.contains("tone-menu")) return "#fbf6ef";
+  if (element.classList.contains("tone-place") || element.classList.contains("tone-atmosphere")) return "#f4f8f2";
+  return "#fbf8f1";
 }
 
 function downloadText(filename, text) {
