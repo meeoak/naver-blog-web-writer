@@ -514,8 +514,9 @@ textarea {
 
 .post-preview h2 {
   margin: 46px auto 16px;
-  padding: 3px 0 3px 14px;
-  border-left: 5px solid var(--gold);
+  padding: 0 0 8px;
+  border-left: 0;
+  border-bottom: 1px solid #e5ddca;
   color: #244735;
   font-size: 22px;
   line-height: 1.45;
@@ -524,13 +525,14 @@ textarea {
 }
 
 .post-preview.is-polished h2 {
-  margin-top: 48px;
-  margin-bottom: 18px;
-  padding: 7px 0 7px 18px;
-  border-left: 6px solid #c8ad67;
+  margin-top: 52px;
+  margin-bottom: 20px;
+  padding: 0 0 11px;
+  border-left: 0;
+  border-bottom: 1px solid #e0d4b9;
   color: #173f36;
-  font-size: 23px;
-  line-height: 1.45;
+  font-size: 24px;
+  line-height: 1.42;
 }
 
 .post-preview h3 {
@@ -565,11 +567,14 @@ textarea {
 }
 
 .post-preview p.is-important {
-  padding: 12px 14px;
-  border-left: 4px solid #c8ad67;
-  background: #fbf8f1;
+  margin-top: 8px;
+  margin-bottom: 22px;
+  padding: 15px 18px;
+  border-left: 0;
+  border-radius: 6px;
+  background: #f8f5ed;
   color: #1e3d32;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .post-preview.is-polished p.tone-menu {
@@ -590,18 +595,15 @@ textarea {
 
 .post-preview.is-polished p.is-important.tone-menu {
   background: #fbf6ef;
-  border-left-color: #c08b58;
 }
 
 .post-preview.is-polished p.is-important.tone-place,
 .post-preview.is-polished p.is-important.tone-atmosphere {
   background: #f4f8f2;
-  border-left-color: #8eae8a;
 }
 
 .post-preview.is-polished p.is-important.tone-tip {
   background: #fbf8f1;
-  border-left-color: #c8ad67;
 }
 
 .preview-keyword {

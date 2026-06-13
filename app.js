@@ -2103,6 +2103,7 @@ function renderPostPreview(text, tags = []) {
   const blocks = [];
   let listOpen = false;
   let firstTextSeen = false;
+  let highlightedInSection = false;
 
   const closeList = () => {
     if (listOpen) {
@@ -2153,6 +2154,7 @@ function renderPostPreview(text, tags = []) {
     }
 
     if (isPreviewHeading(line)) {
+      highlightedInSection = false;
       blocks.push(`<h2>${formatPreviewInline(line)}</h2>`);
     } else if (isPreviewSubheading(line)) {
       blocks.push(`<h3>${formatPreviewInline(line)}</h3>`);
@@ -2163,7 +2165,8 @@ function renderPostPreview(text, tags = []) {
     } else if (line.startsWith("#")) {
       blocks.push(`<p class="preview-tags">${parseCommaOrSpaceTags(line).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</p>`);
     } else {
-      const paragraphClass = previewParagraphClass(line);
+      const paragraphClass = previewParagraphClass(line, { highlightedInSection });
+      if (paragraphClass.split(/\s+/).includes("is-important")) highlightedInSection = true;
       blocks.push(`<p${paragraphClass ? ` class="${paragraphClass}"` : ""}>${formatPreviewInline(line)}</p>`);
     }
   }
@@ -2173,13 +2176,10 @@ function renderPostPreview(text, tags = []) {
   preview.contentEditable = "false";
 }
 
-function previewParagraphClass(line) {
+function previewParagraphClass(line, options = {}) {
   const text = String(line || "");
   const classes = [];
-  if (text.length <= 46 && /(좋았|기억|추천|괜찮|편해|무난|대기|제일|다시|가까운|장점)/.test(text)) {
-    classes.push("is-important");
-  }
-  if (/(이날 제일|운 좋게|대기 없이|다시 가도|한국인 입맛|실패하지|추천하고 싶은|기억에 남)/.test(text)) {
+  if (!options.highlightedInSection && text.length <= 130 && /(이날 제일|운 좋게|대기 없이|다시 가도|한국인 입맛|실패하지|추천하고 싶은|기억에 남|제일 기억|제일 만족|한 번쯤 가볼 만|괜찮을 것 같)/.test(text)) {
     classes.push("is-important");
   }
   if (text.length < 34) classes.push("is-short-note");
@@ -3207,7 +3207,7 @@ function applyInlinePostStyles(root) {
     element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.38;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h2").forEach((element) => {
-    element.setAttribute("style", "margin:48px 0 18px;padding:7px 0 7px 18px;border-left:6px solid #c8ad67;color:#173f36;font-size:23px;line-height:1.45;font-weight:800;letter-spacing:0;");
+    element.setAttribute("style", "margin:52px 0 20px;padding:0 0 11px;border-bottom:1px solid #e0d4b9;color:#173f36;font-size:24px;line-height:1.42;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h3").forEach((element) => {
     element.setAttribute("style", "margin:32px 0 13px;color:#253f34;font-size:19px;line-height:1.52;font-weight:750;letter-spacing:0;");
@@ -3217,7 +3217,7 @@ function applyInlinePostStyles(root) {
     const toneColor = inlineParagraphToneColor(element);
     const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
-      element.setAttribute("style", `${colorBase}padding:12px 14px;border-left:4px solid ${inlineParagraphAccentColor(element)};background:${inlineParagraphBackground(element)};font-weight:650;`);
+      element.setAttribute("style", `${colorBase}margin-top:8px;margin-bottom:22px;padding:15px 18px;border-radius:6px;background:${inlineParagraphBackground(element)};font-weight:600;`);
     } else if (element.classList.contains("is-short-note")) {
       element.setAttribute("style", `${colorBase}font-weight:600;`);
     } else {
@@ -3249,12 +3249,6 @@ function inlineParagraphToneColor(element) {
   if (element.classList.contains("is-important")) return "#1e3d32";
   if (element.classList.contains("is-short-note")) return "#28483b";
   return "";
-}
-
-function inlineParagraphAccentColor(element) {
-  if (element.classList.contains("tone-menu")) return "#c08b58";
-  if (element.classList.contains("tone-place") || element.classList.contains("tone-atmosphere")) return "#8eae8a";
-  return "#c8ad67";
 }
 
 function inlineParagraphBackground(element) {
