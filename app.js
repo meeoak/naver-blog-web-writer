@@ -62,6 +62,7 @@ function bindEvents() {
   $("refreshReportBtn").addEventListener("click", refreshFromEditor);
   $("dietTagsBtn").addEventListener("click", dietTagsFromEditor);
   $("photoInput").addEventListener("change", handlePhotos);
+  $("autoMatchPhotosBtn").addEventListener("click", autoMatchPhotosFromButton);
   $("saveVoiceBtn").addEventListener("click", saveVoicePreset);
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
@@ -149,19 +150,29 @@ function handlePhotos(event) {
   files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = () => {
-      state.photos.push({
+      const photo = {
         id: makeId(),
         name: file.name,
         dataUrl: reader.result,
         caption: autoCaption(file.name, state.photos.length),
         note: "",
         role: autoRole(file.name, state.photos.length),
-      });
+        autoMatched: false,
+        userEdited: false,
+      };
+      state.photos.push(photo);
       loaded += 1;
+      autoMatchPhotos(getInput(), false);
       renderPhotos();
       drawThumbnail();
       refreshReports();
       updatePhotoStatus(`${loaded}장 추가됨. 사진 설명/역할을 확인한 뒤 글 생성을 누르면 원고에 반영돼.`);
+      analyzePhotoVisual(photo).then(() => {
+        autoMatchPhotos(getInput(), false);
+        renderPhotos();
+        drawThumbnail();
+        refreshReports();
+      });
     };
     reader.onerror = () => {
       loaded += 1;
@@ -200,6 +211,156 @@ function autoRole(filename, index) {
   return "body";
 }
 
+function autoMatchPhotosFromButton() {
+  autoMatchPhotos(getInput(), true);
+  renderPhotos();
+  generateAll();
+  updatePhotoStatus(`${state.photos.length}장 사진을 원고 흐름에 맞춰 다시 매치했어.`);
+}
+
+function autoMatchPhotos(input, force = false) {
+  if (!state.photos.length) return;
+  const atmosphereLabels = ["대표 분위기", "입구와 분위기", "내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명"];
+  let atmosphereIndex = 0;
+  let foodIndex = 0;
+
+  state.photos.forEach((photo, index) => {
+    if (photo.userEdited && !force) return;
+
+    const role = inferPhotoRole(photo, index, state.photos.length, input);
+    let caption = photo.caption;
+    let note = photo.note;
+
+    if (role === "thumbnail") {
+      caption = atmosphereLabels[0];
+      note = "대표 사진과 썸네일에 쓰기 좋은 사진.";
+    } else if (role === "interior" || role === "exterior") {
+      caption = atmosphereLabels[Math.min(atmosphereIndex + 1, atmosphereLabels.length - 1)];
+      note = "분위기 설명 파트에 넣기 좋은 사진.";
+      atmosphereIndex += 1;
+    } else if (role === "menu") {
+      caption = "메뉴판";
+      note = "방문해서 먹은 메뉴를 소개하기 전에 넣기 좋은 사진.";
+    } else if (role === "drink") {
+      const menu = matchedMenuForPhoto(photo, input) || input.menus.find((item) => /jahe|madu|자헤|마두|음료|drink/i.test(`${item.name} ${item.local}`)) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
+      caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음료";
+      note = `${caption} 후기 파트에 넣기 좋은 사진.`;
+    } else if (role === "food") {
+      const menu = matchedMenuForPhoto(photo, input) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
+      caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음식 사진";
+      note = `${caption} 후기 파트에 넣기 좋은 사진.`;
+      foodIndex += 1;
+    } else {
+      caption = isGenericPhotoCaption(photo.caption) ? `사진 ${index + 1}` : photo.caption;
+      note = "본문 흐름에 맞춰 보조 사진으로 넣기 좋은 사진.";
+    }
+
+    if (force || isGenericPhotoCaption(photo.caption) || photo.autoMatched) photo.caption = caption;
+    if (force || photo.role === "body" || photo.autoMatched) photo.role = role;
+    if (force || !photo.note || photo.autoMatched) photo.note = note;
+    photo.autoMatched = true;
+  });
+}
+
+function inferPhotoRole(photo, index, total, input) {
+  const text = `${photo.name} ${photo.caption} ${photo.note}`.toLowerCase();
+  if (/menu|메뉴판/.test(text)) return "menu";
+  if (/jahe|madu|drink|beverage|음료|자헤|마두|생강|꿀|tea|차/.test(text)) return "drink";
+  if (/sate|satay|udang|bakar|shrimp|food|dish|plate|사테|우당|새우|음식|요리|밥/.test(text)) return "food";
+  if (/entrance|exterior|outside|입구|외관|간판/.test(text)) return "exterior";
+  if (/interior|inside|table|seat|bar|내부|분위기|자리|조명|소품/.test(text)) return index === 0 ? "thumbnail" : "interior";
+  if (photo.analysis?.visualRole) return index === 0 ? "thumbnail" : photo.analysis.visualRole;
+  if (photo.role && photo.role !== "body") return photo.role;
+  if (index === 0) return "thumbnail";
+  if (index < Math.min(4, total)) return "interior";
+  if (input.menus.length) return "food";
+  return "interior";
+}
+
+function matchedMenuForPhoto(photo, input) {
+  return input.menus.find((menu) => photoMatchesMenu(photo, menu));
+}
+
+function isGenericPhotoCaption(caption) {
+  return !caption || /^사진\s*\d+$/i.test(caption) || ["입구와 분위기", "대표 분위기", "내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명", "음식 사진", "음료"].includes(caption);
+}
+
+function analyzePhotoVisual(photo) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const size = 48;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx || typeof ctx.getImageData !== "function") {
+          resolve();
+          return;
+        }
+        ctx.drawImage(img, 0, 0, size, size);
+        const imageData = ctx.getImageData(0, 0, size, size);
+        if (!imageData || !imageData.data) {
+          resolve();
+          return;
+        }
+        photo.analysis = summarizePhotoPixels(imageData.data, size);
+      } catch (error) {
+        photo.analysis = null;
+      }
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = photo.dataUrl;
+  });
+}
+
+function summarizePhotoPixels(data, size) {
+  let total = 0;
+  let center = 0;
+  let brightCenter = 0;
+  let warmOrGreenCenter = 0;
+  let darkAll = 0;
+  let saturationAll = 0;
+  let saturationCenter = 0;
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const offset = (y * size + x) * 4;
+      const r = data[offset];
+      const g = data[offset + 1];
+      const b = data[offset + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const brightness = (r + g + b) / 3;
+      const saturation = max ? (max - min) / max : 0;
+      const isCenter = x > size * 0.22 && x < size * 0.78 && y > size * 0.22 && y < size * 0.78;
+      total += 1;
+      saturationAll += saturation;
+      if (brightness < 72) darkAll += 1;
+      if (isCenter) {
+        center += 1;
+        saturationCenter += saturation;
+        if (brightness > 135) brightCenter += 1;
+        if ((r > 120 && g > 70 && b < 120) || (g > r * 0.9 && g > b * 1.08)) warmOrGreenCenter += 1;
+      }
+    }
+  }
+
+  const centerBrightRatio = brightCenter / Math.max(center, 1);
+  const centerFoodColorRatio = warmOrGreenCenter / Math.max(center, 1);
+  const avgSaturation = saturationAll / Math.max(total, 1);
+  const centerSaturation = saturationCenter / Math.max(center, 1);
+  const darkRatio = darkAll / Math.max(total, 1);
+  let visualRole = "interior";
+  if ((centerBrightRatio > 0.18 && centerSaturation > 0.28) || centerFoodColorRatio > 0.24 || (avgSaturation > 0.36 && darkRatio < 0.6)) {
+    visualRole = "food";
+  }
+  if (darkRatio > 0.62 && centerFoodColorRatio < 0.16) visualRole = "interior";
+  return { centerBrightRatio, centerFoodColorRatio, avgSaturation, darkRatio, visualRole };
+}
+
 function renderPhotos() {
   const list = $("photoList");
   if (!state.photos.length) {
@@ -223,13 +384,17 @@ function renderPhotos() {
   `).join("");
 
   list.querySelectorAll("[data-photo-field]").forEach((field) => {
-    field.addEventListener("input", () => {
+    const handlePhotoFieldChange = () => {
       const item = field.closest(".photo-item");
       const photo = state.photos.find((entry) => entry.id === item.dataset.id);
+      photo.userEdited = true;
+      photo.autoMatched = false;
       photo[field.dataset.photoField] = field.value;
       refreshReports();
       if (field.dataset.photoField === "role" || field.dataset.photoField === "caption") drawThumbnail();
-    });
+    };
+    field.addEventListener("input", handlePhotoFieldChange);
+    field.addEventListener("change", handlePhotoFieldChange);
   });
 }
 
@@ -249,6 +414,8 @@ function roleOptions(current) {
 
 function generateAll() {
   const input = getInput();
+  autoMatchPhotos(input, false);
+  renderPhotos();
   state.titleCandidates = makeTitleCandidates(input);
   state.tags = makeTags(input);
   state.naverPost = makeNaverPost(input, state.tags);
