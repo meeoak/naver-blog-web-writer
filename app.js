@@ -69,6 +69,7 @@ function bindEvents() {
   $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
   $("downloadPostBtn").addEventListener("click", () => downloadText("naver_post.md", $("postEditor").value));
   $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
+  $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
   $("fixAiBtn").addEventListener("click", fixAiSmell);
   $("tagEditor").addEventListener("input", () => {
     state.tags = parseCommaOrSpaceTags($("tagEditor").value);
@@ -226,7 +227,7 @@ function generateAll() {
   state.titleCandidates = makeTitleCandidates(input);
   state.tags = makeTags(input);
   state.naverPost = makeNaverPost(input, state.tags);
-  state.blogspotPost = makeBlogspotPost(input, state.tags);
+  state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
   $("postEditor").value = state.naverPost;
   $("blogspotEditor").value = state.blogspotPost;
   $("tagEditor").value = state.tags.join(" ");
@@ -552,32 +553,237 @@ function makeNaverPost(input, tags) {
   ].filter((line) => line !== undefined).join("\n");
 }
 
-function makeBlogspotPost(input, tags) {
-  const place = input.place || input.topic;
-  const title = `${place} Review｜Kokas Jakarta 맛집`;
-  const english = `${place} is an Indonesian restaurant in Kokas mall, Jakarta, good for ${input.menus.map((menu) => menu.local || menu.name).filter(Boolean).slice(0, 3).join(", ")}.`;
+function makeBlogspotPost(input, tags, naverPost = "") {
+  naverPost = naverPost || makeNaverPost(input, tags);
+  return convertNaverPostToBlogspot(input, tags, naverPost);
+}
+
+function convertCurrentNaverToBlogspot() {
+  const input = getInput();
+  const tags = parseCommaOrSpaceTags($("tagEditor").value || state.tags.join(" "));
+  const naverPost = $("postEditor").value.trim() || makeNaverPost(input, tags);
+  state.blogspotPost = convertNaverPostToBlogspot(input, tags, naverPost);
+  $("blogspotEditor").value = state.blogspotPost;
+  activateTab("blogspot");
+}
+
+function convertNaverPostToBlogspot(input, tags, naverPost) {
+  const title = makeBlogspotTitle(input);
+  const description = makeBlogspotSearchDescription(input);
+  const labels = makeBlogspotLabels(input, tags);
+  const slug = makeBlogspotSlug(input);
+  const body = naverToBlogspotHtml(naverPost, input);
   return [
+    "TITLE",
     title,
     "",
-    "Search description",
-    `${place} 후기. 코타카사블랑카 Kokas 안에서 먹은 메뉴와 한국인 입맛 기준 방문 팁.`,
+    "SEARCH DESCRIPTION",
+    description,
     "",
-    "Intro",
-    [input.date, input.situation].filter(Boolean).join(", "),
+    "PERMALINK",
+    slug,
     "",
-    "Quick Summary",
-    ...makeCheckPoints(input).map((item) => `- ${item}`),
+    "LABELS",
+    labels.join(", "),
     "",
-    "Menu Review",
-    ...input.menus.flatMap((menu) => [`### ${menu.name}${menu.local ? ` (${menu.local})` : ""}`, menu.note || "내 기준으로 무난하게 먹기 좋았어.", ""]),
-    "FAQ",
-    "Q. Is it good for Korean visitors?",
-    "A. 내 기준으로는 처음 인도네시아 음식을 먹는 한국인도 비교적 편하게 먹기 좋은 편이야.",
-    "",
-    english,
-    "",
-    tags.join(" "),
+    "BODY HTML",
+    body,
   ].join("\n");
+}
+
+function makeBlogspotTitle(input) {
+  const place = input.place || input.topic;
+  const menus = input.menus.map((menu) => menu.local || menu.name).filter(Boolean).slice(0, 3).join(", ");
+  return `${place} Review: Kokas Jakarta 맛집${menus ? ` with ${menus}` : ""}`;
+}
+
+function makeBlogspotSearchDescription(input) {
+  const place = input.place || input.topic;
+  const menus = menuNames(input).join(", ") || "추천 메뉴";
+  return `${place} 후기. Kokas mall Jakarta에서 먹은 ${menus}, 한국인 입맛 기준 분위기, 예약 팁, 위치 정보를 정리한 블로그스팟용 리뷰.`;
+}
+
+function makeBlogspotSlug(input) {
+  const place = input.place || input.topic || "blog-post";
+  const localMenus = input.menus.map((menu) => menu.local).filter(Boolean).slice(0, 2).join(" ");
+  const source = `${place} ${localMenus} review kokas jakarta`;
+  return slugify(source).slice(0, 80).replace(/-$/g, "");
+}
+
+function makeBlogspotLabels(input, tags) {
+  const preferred = [
+    "Jakarta Restaurant",
+    "Jakarta Food",
+    "Indonesian Food",
+    "Kokas",
+    "Kota Kasablanka",
+    "Pesta Kebun",
+    ...input.menus.map((menu) => menu.local || menu.name),
+    ...tags.map((tag) => tag.replace("#", "")),
+  ];
+  return unique(preferred.map((item) => cleanLabel(item)).filter(Boolean)).slice(0, 14);
+}
+
+function cleanLabel(text) {
+  return String(text || "")
+    .replace(/^#/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function slugify(text) {
+  return String(text || "")
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function naverToBlogspotHtml(naverPost, input) {
+  const title = naverPost.split(/\r?\n/).find(Boolean) || makeBlogspotTitle(input);
+  const bodyLines = stripNaverPostForBlogspot(naverPost, title);
+  const html = [
+    `<p><strong>${escapeHtml(englishSeoLine(input))}</strong></p>`,
+    `<p>${escapeHtml(makeBlogspotSearchDescription(input))}</p>`,
+    "",
+    "<h2>Quick Summary</h2>",
+    "<ul>",
+    ...makeCheckPoints(input).map((item) => `<li>${escapeHtml(item)}</li>`),
+    "</ul>",
+    "",
+    "<h2>Table of Contents</h2>",
+    "<ul>",
+    ...blogspotTocItems(input).map((item) => `<li>${escapeHtml(item)}</li>`),
+    "</ul>",
+    "",
+    ...convertLinesToHtml(bodyLines, input),
+  ];
+  return html.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function stripNaverPostForBlogspot(naverPost, title) {
+  return naverPost
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line, index) => {
+      if (!line) return true;
+      if (index === 0 && line === title) return false;
+      if (/^#[^\s#]+(?:\s+#[^\s#]+)+$/.test(line)) return false;
+      if (/^[A-Za-z].+ is an .+\.$/.test(line)) return false;
+      return true;
+    });
+}
+
+function blogspotTocItems(input) {
+  return [
+    "Why I went back",
+    "Atmosphere at Pesta Kebun Kokas",
+    `${menuNames(input).join(", ") || "Menu"} review`,
+    "Reservation and visit tips",
+    "FAQ for Korean visitors",
+    "Location in Kota Kasablanka",
+  ];
+}
+
+function convertLinesToHtml(rawLines, input) {
+  const html = [];
+  let listOpen = false;
+
+  const closeList = () => {
+    if (listOpen) {
+      html.push("</ul>");
+      listOpen = false;
+    }
+  };
+
+  rawLines.forEach((line) => {
+    if (!line) {
+      closeList();
+      html.push("");
+      return;
+    }
+
+    if (line.startsWith("· ")) {
+      if (!listOpen) {
+        html.push("<ul>");
+        listOpen = true;
+      }
+      html.push(`<li>${escapeHtml(line.replace(/^·\s*/, ""))}</li>`);
+      return;
+    }
+
+    closeList();
+
+    if (isBlogspotH2(line)) {
+      html.push(`<h2>${escapeHtml(blogspotHeading(line))}</h2>`);
+      return;
+    }
+
+    if (isMenuHeading(line, input)) {
+      html.push(`<h3>${escapeHtml(line)}</h3>`);
+      return;
+    }
+
+    if (/^Q\./.test(line)) {
+      html.push(`<h3>${escapeHtml(line)}</h3>`);
+      return;
+    }
+
+    if (/^https?:\/\//.test(line)) {
+      html.push(`<p><a href="${escapeAttr(line)}" target="_blank" rel="noopener">${escapeHtml(line)}</a></p>`);
+      return;
+    }
+
+    if (/^\[사진/.test(line)) {
+      html.push(`<p><em>${escapeHtml(line)}</em></p>`);
+      return;
+    }
+
+    html.push(`<p>${escapeHtml(line)}</p>`);
+  });
+
+  closeList();
+  return html;
+}
+
+function isBlogspotH2(line) {
+  return line.endsWith("는 이런 곳이야") || [
+    "다시 가도 좋았던 이유",
+    "방문한 날의 기록",
+    "분위기가 먼저 예쁜 곳",
+    "방문해서 먹은 메뉴",
+    "예약과 방문 팁",
+    "방문 전 자주 묻는 질문",
+    "위치와 이동 팁",
+    "결론은,, 다시 갈 만한 곳",
+  ].includes(line);
+}
+
+function blogspotHeading(line) {
+  if (line.endsWith("는 이런 곳이야")) return `What ${line.replace("는 이런 곳이야", "")} is like`;
+  const map = {
+    "다시 가도 좋았던 이유": "Why I went back to Pesta Kebun Kokas",
+    "방문한 날의 기록": "Visit note",
+    "Pesta Kebun Kokas는 이런 곳이야": "What Pesta Kebun Kokas is like",
+    "분위기가 먼저 예쁜 곳": "Atmosphere at Pesta Kebun Kokas",
+    "방문해서 먹은 메뉴": "Menu review",
+    "예약과 방문 팁": "Reservation and visit tips",
+    "방문 전 자주 묻는 질문": "FAQ before visiting",
+    "위치와 이동 팁": "Location and transport tips",
+    "결론은,, 다시 갈 만한 곳": "Final thoughts",
+  };
+  return map[line] || line;
+}
+
+function isMenuHeading(line, input) {
+  return input.menus.some((menu) => {
+    const label = `${menu.name}${menu.local ? `(${menu.local})` : ""}`;
+    return line === label;
+  });
 }
 
 function makeCheckPoints(input) {
