@@ -573,18 +573,7 @@ function makeAtmosphereSection(input) {
     linesOut.push("");
     interiorPhotos.forEach((photo) => {
       linesOut.push(`[사진 ${photo.index}: ${photo.caption}]`);
-      linesOut.push(photo.note || `${photo.caption} 사진은 분위기 설명 바로 아래에 넣으면 좋아.`);
-    });
-  } else {
-    [
-      "입구와 간판",
-      "따뜻한 조명과 나무톤 인테리어",
-      "바 쪽 분위기",
-      "벽면 소품과 꽃 장식",
-      "테이블에 음식이 놓인 순간",
-    ].forEach((caption, index) => {
-      linesOut.push(`[사진 자리 ${index + 1}: ${caption}]`);
-      linesOut.push(`${caption} 사진을 넣으면 글이 훨씬 실제 방문 후기처럼 살아나. 특히 분위기 사진은 메뉴 사진 사이에 넣으면 읽는 흐름이 덜 딱딱해져.`);
+      linesOut.push(photo.note || photoNarrativeNote(photo.role, photo.caption, photo.matchedMenu, input));
     });
   }
 
@@ -636,9 +625,6 @@ function makeMenuReview(menu, input) {
     linesOut.push("다만 소스가 진한 편이라 계속 먹으면 살짝 무겁게 느껴질 수도 있어. 그럴 때 라임을 조금 곁들이면 훨씬 깔끔해지고, 다른 메뉴랑 번갈아 먹기도 좋아.");
     if (menuPhotos.length) {
       linesOut.push(...menuPhotos);
-    } else {
-      linesOut.push("[사진 자리: 사테]");
-      linesOut.push("소스가 듬뿍 올라간 사테 사진은 메뉴 설명 바로 아래에 넣으면 좋아. 보기만 해도 진한 맛이 느껴져서 글의 설득력이 확 살아나.");
     }
     return linesOut;
   }
@@ -654,9 +640,6 @@ function makeMenuReview(menu, input) {
     linesOut.push("겉은 살짝 그을린 느낌이 있고 안쪽은 탱글한 상태면 제일 맛있어. 여기에 튀긴 샬롯이 올라가면 식감이 더 살아나서 한입 먹을 때 더 만족스럽더라.");
     if (menuPhotos.length) {
       linesOut.push(...menuPhotos);
-    } else {
-      linesOut.push("[사진 자리: 우당 바카르]");
-      linesOut.push("우당 바카르는 메인 사진으로 쓰기 좋아. 새우, 라임, 삼발이 한 번에 보이면 이 식당에서 뭘 먹었는지가 바로 전달돼.");
     }
     return linesOut;
   }
@@ -671,9 +654,6 @@ function makeMenuReview(menu, input) {
     linesOut.push("생강 향에 약한 사람이라도 음식이랑 같이 천천히 마시면 크게 부담스럽지는 않을 것 같아. 오히려 기름지거나 양념 진한 메뉴를 먹은 뒤에는 속이 조금 편해지는 느낌도 있었어.");
     if (menuPhotos.length) {
       linesOut.push(...menuPhotos);
-    } else {
-      linesOut.push("[사진 자리: 자헤 마두]");
-      linesOut.push("따뜻한 음료 사진은 글 후반부에 넣으면 좋아. 음식 후기에서 음료로 넘어가는 흐름이 자연스러워져.");
     }
     return linesOut;
   }
@@ -693,7 +673,7 @@ function photoLinesForMenu(menu, input) {
 
   return matches.flatMap((photo) => [
     `[사진 ${photo.index}: ${photo.caption}]`,
-    photo.note || `${photo.caption} 사진은 ${menu.name} 후기 흐름에 맞춰 이 부분에 넣으면 좋아.`,
+    photo.note || photoNarrativeNote(photo.role, photo.caption, menu, input),
   ]);
 }
 
