@@ -530,7 +530,7 @@ function makePlaceSection(input) {
   const short = shortPlace(place);
   return [
     `${short}는 이런 곳이야`,
-    `${short}는 코타카사블랑카 안에서 인도네시아 음식을 편하게 먹기 좋은 식당이야. 분위기는 따뜻하고, 메뉴도 한국인 입맛에 너무 어렵지 않은 편이라 처음 오는 사람을 데려가기에도 괜찮아.`,
+    "코타카사블랑카 안에서 인도네시아 음식을 편하게 먹기 좋은 식당이야. 분위기는 따뜻하고, 메뉴도 한국인 입맛에 너무 어렵지 않은 편이라 처음 오는 사람을 데려가기에도 괜찮아.",
     "· 몰 안에 있어서 퇴근길이나 약속 전후로 들르기 편해",
     "· 음식이 대체로 무난해서 실패 확률이 낮아",
     "· 분위기가 따뜻해서 다시 가도 기분 좋은 곳이야",
@@ -1286,6 +1286,10 @@ function renderPostPreview(text, tags = []) {
       closeList();
       continue;
     }
+    const prevLine = (linesRaw[i - 1] || "").trim();
+    if (prevLine && normalizePreviewLine(prevLine) === normalizePreviewLine(line)) {
+      continue;
+    }
 
     const photoMatch = line.match(/^\[사진\s+(\d+):\s*(.+?)\]$/);
     if (photoMatch) {
@@ -1344,6 +1348,10 @@ function shouldUseLineAsPhotoNote(line) {
   if (/^https?:\/\//.test(line)) return false;
   if (line.startsWith("#")) return false;
   return !isPreviewHeading(line) && !isPreviewSubheading(line);
+}
+
+function normalizePreviewLine(line) {
+  return String(line || "").replace(/\s+/g, " ").trim();
 }
 
 function renderPreviewPhoto(photo, caption, note) {
