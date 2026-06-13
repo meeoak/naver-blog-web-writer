@@ -3210,7 +3210,7 @@ function applyInlinePostStyles(root) {
     element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.36;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h2").forEach((element) => {
-    element.setAttribute("style", "margin:44px 0 18px;padding:0 0 11px;border-bottom:1px solid #e0d4b9;color:#173f36;font-size:24px;line-height:1.34;font-weight:800;letter-spacing:0;");
+    element.setAttribute("style", "margin:48px 0 19px;padding:0 0 9px 16px;border-left:5px solid #c7aa68;border-bottom:0;background:linear-gradient(#d8c28b,#d8c28b) 16px 100% / 68px 2px no-repeat;color:#173f36;font-size:23.5px;line-height:1.36;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h3").forEach((element) => {
     element.setAttribute("style", "margin:28px 0 12px;color:#253f34;font-size:19px;line-height:1.42;font-weight:750;letter-spacing:0;");
