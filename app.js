@@ -86,13 +86,13 @@ function bindEvents() {
   });
   $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
   $("exportGoogleDocsBtn").addEventListener("click", exportToGoogleDocs);
-  $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
+  if ($("copyBlogspotBtn")) $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
   $("downloadPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
     downloadText("naver_post.md", $("postEditor").value);
   });
-  $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
-  $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
+  if ($("downloadBlogspotBtn")) $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
+  if ($("convertBlogspotBtn")) $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
   $("aiSearchReviewBtn").addEventListener("click", runAIWebReview);
   if ($("polishPostBtn")) $("polishPostBtn").addEventListener("click", polishPostLayout);
   $("toggleEditorBtn").addEventListener("click", toggleDirectPreviewEdit);
@@ -116,6 +116,10 @@ function bindEvents() {
 
   document.querySelectorAll("[data-insert]").forEach((btn) => {
     btn.addEventListener("click", () => insertSnippet(btn.dataset.insert));
+  });
+
+  document.querySelectorAll("[data-open-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.openTab));
   });
 }
 
@@ -158,7 +162,9 @@ function isOpenAIKeyLike(value) {
 function activateTab(name) {
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === name));
   document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("is-active"));
-  $(`${name}Tab`).classList.add("is-active");
+  const panel = $(`${name}Tab`);
+  if (!panel) return;
+  panel.classList.add("is-active");
   if (name === "thumbnail") drawThumbnail();
   if (name === "report") refreshReports();
 }
@@ -621,7 +627,7 @@ function generateAll() {
   state.naverPost = makeNaverPost(input, state.tags);
   state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
   $("postEditor").value = state.naverPost;
-  $("blogspotEditor").value = state.blogspotPost;
+  if ($("blogspotEditor")) $("blogspotEditor").value = state.blogspotPost;
   $("tagEditor").value = state.tags.join(" ");
   renderTitleCandidates();
   drawThumbnail();
@@ -925,7 +931,7 @@ function applyOpenAIResult(result, input) {
   if (result.thumbnail_title) $("thumbTitleInput").value = String(result.thumbnail_title).trim();
   if (result.thumbnail_ribbon) $("thumbRibbonInput").value = String(result.thumbnail_ribbon).trim();
   $("postEditor").value = state.naverPost;
-  $("blogspotEditor").value = state.blogspotPost;
+  if ($("blogspotEditor")) $("blogspotEditor").value = state.blogspotPost;
   $("tagEditor").value = state.tags.join(" ");
   renderTitleCandidates();
   drawThumbnail();
@@ -1064,7 +1070,7 @@ function applyWebReviewResult(result, input, rawData) {
   state.naverPost = revisedPost;
   state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
   $("postEditor").value = state.naverPost;
-  $("blogspotEditor").value = state.blogspotPost;
+  if ($("blogspotEditor")) $("blogspotEditor").value = state.blogspotPost;
   $("tagEditor").value = state.tags.join(" ");
   state.aiSearchReport = result.report || [];
   state.aiSearchSources = mergeWebSources(result.sources || [], rawData);
@@ -1576,8 +1582,8 @@ function convertCurrentNaverToBlogspot() {
   const tags = parseCommaOrSpaceTags($("tagEditor").value || state.tags.join(" "));
   const naverPost = $("postEditor").value.trim() || makeNaverPost(input, tags);
   state.blogspotPost = convertNaverPostToBlogspot(input, tags, naverPost);
-  $("blogspotEditor").value = state.blogspotPost;
-  activateTab("blogspot");
+  if ($("blogspotEditor")) $("blogspotEditor").value = state.blogspotPost;
+  if ($("blogspotTab")) activateTab("blogspot");
 }
 
 function convertNaverPostToBlogspot(input, tags, naverPost) {
@@ -3068,19 +3074,121 @@ function drawPlate(ctx, x, y, w, h, fill) {
 function drawThumbnailOverlay(ctx, canvas, input, accent) {
   const w = canvas.width;
   const h = canvas.height;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
   ctx.fillRect(0, 0, w, h);
-  const radial = ctx.createRadialGradient(780, 360, 80, 780, 360, 680);
+
+  const bottomFade = ctx.createLinearGradient(0, h * 0.38, 0, h);
+  bottomFade.addColorStop(0, "rgba(0,0,0,0)");
+  bottomFade.addColorStop(0.56, "rgba(0,0,0,0.34)");
+  bottomFade.addColorStop(1, "rgba(0,0,0,0.74)");
+  ctx.fillStyle = bottomFade;
+  ctx.fillRect(0, 0, w, h);
+
+  const sideFade = ctx.createLinearGradient(0, 0, w * 0.7, 0);
+  sideFade.addColorStop(0, "rgba(0,0,0,0.38)");
+  sideFade.addColorStop(0.72, "rgba(0,0,0,0)");
+  ctx.fillStyle = sideFade;
+  ctx.fillRect(0, 0, w, h);
+
+  const radial = ctx.createRadialGradient(w * 0.66, h * 0.5, 110, w * 0.66, h * 0.5, 760);
   radial.addColorStop(0, "rgba(0,0,0,0)");
-  radial.addColorStop(1, "rgba(0,0,0,0.28)");
+  radial.addColorStop(1, "rgba(0,0,0,0.26)");
   ctx.fillStyle = radial;
   ctx.fillRect(0, 0, w, h);
 
   drawBrandPill(ctx, input.brand || "Ara in Indonesia");
-  const [top, bottom] = splitTitle(input.thumbTitle || shortPlace(input.place || input.topic));
-  drawShadowText(ctx, top, 56, 154, "76px Georgia", "#fff8ef", "#111");
-  if (bottom) drawShadowText(ctx, bottom, 56, 300, "138px Georgia", accent, "#111");
-  drawRibbon(ctx, input.thumbRibbon || "내 기준 솔직 후기", accent, bottom ? 482 : 354);
+  drawThumbnailSpeech(ctx, "맛있다", 86, h - 232);
+  drawThumbnailSubtitle(ctx, input.thumbRibbon || "내 기준 솔직 후기", w - 58, h - 214, accent);
+  drawMainThumbnailTitle(ctx, input.thumbTitle || shortPlace(input.place || input.topic), 58, h - 44, w - 112, accent);
+}
+
+function drawThumbnailSubtitle(ctx, text, rightX, y, accent) {
+  ctx.save();
+  let fontSize = 35;
+  ctx.font = `900 italic ${fontSize}px Arial`;
+  while (ctx.measureText(text).width > 560 && fontSize > 25) {
+    fontSize -= 2;
+    ctx.font = `900 italic ${fontSize}px Arial`;
+  }
+  const textWidth = ctx.measureText(text).width;
+  const x = rightX - textWidth;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.fillStyle = "#fff8ef";
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(x + 6, y + 14);
+  ctx.lineTo(x + textWidth - 4, y + 10);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawThumbnailSpeech(ctx, text, x, y) {
+  ctx.save();
+  ctx.font = "900 24px Arial";
+  const width = Math.max(92, ctx.measureText(text).width + 34);
+  roundRect(ctx, x, y - 38, width, 42, 20, "rgba(255,255,255,0.92)", true);
+  ctx.fillStyle = "#25332c";
+  ctx.fillText(text, x + 17, y - 10);
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.moveTo(x + 22, y - 3);
+  ctx.lineTo(x + 37, y + 17);
+  ctx.lineTo(x + 52, y - 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMainThumbnailTitle(ctx, title, x, baseline, maxWidth, accent) {
+  const lines = thumbnailTitleLines(title);
+  const hasTwoLines = lines.length > 1;
+  if (hasTwoLines) {
+    drawImpactText(ctx, lines[0], x, baseline - 126, maxWidth, 78, "#fffdf5");
+    drawImpactText(ctx, lines[1], x, baseline, maxWidth, 158, "#fffdf5");
+  } else {
+    drawImpactText(ctx, lines[0], x, baseline, maxWidth, 166, "#fffdf5");
+  }
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 9;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x + 6, baseline + 18);
+  ctx.lineTo(Math.min(x + maxWidth * 0.7, x + 690), baseline + 11);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawImpactText(ctx, text, x, baseline, maxWidth, startSize, color) {
+  ctx.save();
+  let fontSize = startSize;
+  ctx.font = `900 italic ${fontSize}px Arial Black, Arial, sans-serif`;
+  while (ctx.measureText(text).width > maxWidth && fontSize > 52) {
+    fontSize -= 4;
+    ctx.font = `900 italic ${fontSize}px Arial Black, Arial, sans-serif`;
+  }
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(8, Math.round(fontSize * 0.085));
+  ctx.strokeStyle = "rgba(0,0,0,0.88)";
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.fillText(text, x + 8, baseline + 9);
+  ctx.strokeText(text, x, baseline);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, baseline);
+  ctx.restore();
+}
+
+function thumbnailTitleLines(title) {
+  const clean = String(title || "").replace(/\s+/g, " ").trim();
+  if (!clean) return ["맛집 후기"];
+  const words = clean.split(" ");
+  if (words.length === 1) return [clean];
+  if (words.length === 2) return words;
+  return [words.slice(0, -1).join(" "), words.at(-1)];
 }
 
 function drawBrandPill(ctx, label) {

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260614-google-docs-title">
+  <link rel="stylesheet" href="styles.css?v=20260614-thumbnail-nav">
 </head>
 <body>
   <main class="app-shell">
@@ -61,7 +61,7 @@ Casa Residence에서 가까워서 들르기 편함
           <input id="keywordKoInput" type="text" value="자카르타 맛집, 코타카사블랑카 맛집, 인도네시아 음식, 인도네시아 주재원">
         </label>
         <label>
-          <span>구글/블로그스팟 검색어</span>
+          <span>구글 검색어</span>
           <input id="keywordGoogleInput" type="text" value="Pesta Kebun Kota Kasablanka, Pesta Kebun Kokas, Kota Kasablanka, Sate, Udang Bakar, Jahe Madu">
         </label>
         <label>
@@ -168,13 +168,12 @@ Casa Residence에서 가까워서 들르기 편함
     <section class="work-pane" aria-label="작성">
       <nav class="tab-bar" aria-label="결과 탭">
         <button class="tab is-active" data-tab="naver" type="button">네이버 원고</button>
-        <button class="tab" data-tab="blogspot" type="button">블로그스팟</button>
-        <button class="tab" data-tab="thumbnail" type="button">썸네일</button>
         <button class="tab" data-tab="report" type="button">리포트</button>
       </nav>
 
       <section id="naverTab" class="tab-panel is-active">
         <div class="editor-toolbar">
+          <button type="button" data-open-tab="thumbnail">썸네일 작성기</button>
           <button type="button" data-insert="h2">단락 제목</button>
           <button type="button" data-insert="h3">메뉴 제목</button>
           <button type="button" id="toggleEditorBtn">바로 수정</button>
@@ -194,15 +193,6 @@ Casa Residence에서 가까워서 들르기 편함
           </div>
           <textarea id="postEditor" class="post-editor" spellcheck="false"></textarea>
         </div>
-      </section>
-
-      <section id="blogspotTab" class="tab-panel">
-        <div class="editor-toolbar">
-          <button type="button" id="convertBlogspotBtn">네이버 원고 변환</button>
-          <button type="button" id="copyBlogspotBtn">블로그스팟 복사</button>
-          <button type="button" id="downloadBlogspotBtn">블로그스팟 저장</button>
-        </div>
-        <textarea id="blogspotEditor" class="post-editor" spellcheck="false"></textarea>
       </section>
 
       <section id="thumbnailTab" class="tab-panel">
@@ -265,6 +255,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260614-google-docs-title"></script>
+  <script src="app.js?v=20260614-thumbnail-nav"></script>
 </body>
 </html>
