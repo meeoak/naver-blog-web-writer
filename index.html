@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-movable-photo-captions">
+  <link rel="stylesheet" href="styles.css?v=20260613-openai-writer">
 </head>
 <body>
   <main class="app-shell">
@@ -130,6 +130,31 @@ Casa Residence에서 가까워서 들르기 편함
         <div id="voicePresetList" class="chip-row"></div>
       </section>
 
+      <section class="tool-surface">
+        <div class="section-head">
+          <div>
+            <h2>OpenAI 자동 작성</h2>
+            <p>사진과 경험을 AI가 같이 보고 원고를 다시 써요.</p>
+          </div>
+          <button id="aiGenerateBtn" class="primary-btn" type="button">AI 원고 생성</button>
+        </div>
+        <div class="field-grid">
+          <label>
+            <span>OpenAI API 키</span>
+            <input id="openaiKeyInput" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+          <label>
+            <span>모델</span>
+            <input id="aiModelInput" type="text" value="gpt-5.5">
+          </label>
+        </div>
+        <label class="stacked">
+          <span>AI 요청 메모</span>
+          <textarea id="aiInstructionInput" rows="3">구글문서에 정리했던 것처럼, 내 경험을 바탕으로 자연스러운 네이버 블로그 후기처럼 써줘. 사진은 직접 보고 어울리는 위치에 넣고, 확실하지 않은 메뉴명은 단정하지 마.</textarea>
+        </label>
+        <p id="aiStatus" class="metric-row">API 키는 깃허브에 저장되지 않고 이 브라우저에만 저장돼요.</p>
+      </section>
+
       <div class="action-row">
         <button id="generateBtn" class="primary-btn" type="button">글 생성</button>
         <button id="refreshReportBtn" class="secondary-btn" type="button">수정 내용 분석</button>
@@ -222,6 +247,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260613-movable-photo-captions"></script>
+  <script src="app.js?v=20260613-openai-writer"></script>
 </body>
 </html>

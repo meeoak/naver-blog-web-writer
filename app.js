@@ -51,6 +51,7 @@ const adRules = [
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
+  loadOpenAISettings();
   bindEvents();
   renderVoicePresets();
   renderPhotos();
@@ -66,6 +67,10 @@ function bindEvents() {
   $("photoDensityInput").addEventListener("change", generateAll);
   $("photoCaptionModeInput").addEventListener("change", generateAll);
   $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
+  $("aiGenerateBtn").addEventListener("click", generateWithOpenAI);
+  ["openaiKeyInput", "aiModelInput", "aiInstructionInput"].forEach((id) => {
+    $(id).addEventListener("input", saveOpenAISettings);
+  });
   $("saveVoiceBtn").addEventListener("click", saveVoicePreset);
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
@@ -94,6 +99,21 @@ function bindEvents() {
   document.querySelectorAll("[data-insert]").forEach((btn) => {
     btn.addEventListener("click", () => insertSnippet(btn.dataset.insert));
   });
+}
+
+function loadOpenAISettings() {
+  const key = localStorage.getItem("naverBlogOpenAIKey") || "";
+  const model = localStorage.getItem("naverBlogOpenAIModel") || "gpt-5.5";
+  const instruction = localStorage.getItem("naverBlogOpenAIInstruction") || "";
+  if ($("openaiKeyInput")) $("openaiKeyInput").value = key;
+  if ($("aiModelInput")) $("aiModelInput").value = model;
+  if (instruction && $("aiInstructionInput")) $("aiInstructionInput").value = instruction;
+}
+
+function saveOpenAISettings() {
+  localStorage.setItem("naverBlogOpenAIKey", $("openaiKeyInput").value.trim());
+  localStorage.setItem("naverBlogOpenAIModel", $("aiModelInput").value.trim() || "gpt-5.5");
+  localStorage.setItem("naverBlogOpenAIInstruction", $("aiInstructionInput").value.trim());
 }
 
 function activateTab(name) {
@@ -565,6 +585,271 @@ function generateAll() {
   renderTitleCandidates();
   drawThumbnail();
   refreshReports();
+}
+
+async function generateWithOpenAI() {
+  const apiKey = $("openaiKeyInput").value.trim();
+  const model = $("aiModelInput").value.trim() || "gpt-5.5";
+  if (!apiKey) {
+    setAiStatus("OpenAI API 키를 먼저 넣어줘. ChatGPT 로그인과 API 키는 별도야.", true);
+    return;
+  }
+
+  saveOpenAISettings();
+  const input = getInput();
+  autoMatchPhotos(input, true);
+  renderPhotos();
+  setAiStatus("사진을 AI가 읽을 수 있게 준비하는 중...");
+
+  try {
+    const aiPhotos = await prepareOpenAIPhotos(input);
+    setAiStatus(`OpenAI에 원고를 요청하는 중... 사진 ${aiPhotos.length}장을 같이 보낼게.`);
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(makeOpenAIRequestBody(model, input, aiPhotos)),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data?.error?.message || `OpenAI 요청 실패 (${response.status})`;
+      throw new Error(message);
+    }
+
+    const rawText = extractOpenAIText(data);
+    const result = parseOpenAIJson(rawText);
+    applyOpenAIResult(result, input);
+    setAiStatus(`AI 원고 생성 완료. 사진 ${aiPhotos.length}장을 보고 글 흐름에 맞춰 다시 썼어.`);
+  } catch (error) {
+    setAiStatus(`AI 원고 생성 실패: ${error.message}`, true);
+  }
+}
+
+function setAiStatus(message, isError = false) {
+  const status = $("aiStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("status-warn", Boolean(isError));
+  status.classList.toggle("status-good", !isError && /완료|저장|성공/.test(message));
+}
+
+async function prepareOpenAIPhotos(input) {
+  const limit = input.photoDensity === "all" ? 24 : input.photoDensity === "many" ? 18 : 14;
+  const photos = state.photos.slice(0, limit);
+  const prepared = [];
+
+  for (let i = 0; i < photos.length; i += 1) {
+    const photo = photos[i];
+    try {
+      const imageUrl = await resizePhotoForOpenAI(photo.dataUrl);
+      prepared.push({
+        index: i + 1,
+        name: photo.name || `photo-${i + 1}`,
+        caption: photo.caption || "",
+        note: photo.note || "",
+        role: photo.role || "",
+        imageUrl,
+      });
+    } catch (error) {
+      console.warn("OpenAI photo skipped", photo.name, error);
+    }
+  }
+
+  return prepared;
+}
+
+function resizePhotoForOpenAI(dataUrl, maxSide = 1280, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sourceWidth = img.naturalWidth || img.width;
+      const sourceHeight = img.naturalHeight || img.height;
+      const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("사진 변환을 할 수 없어요."));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => reject(new Error("사진을 읽지 못했어요. JPG, PNG, WEBP 사진을 써줘."));
+    img.src = dataUrl;
+  });
+}
+
+function makeOpenAIRequestBody(model, input, aiPhotos) {
+  const content = [
+    {
+      type: "input_text",
+      text: makeOpenAIPrompt(input, aiPhotos),
+    },
+  ];
+
+  aiPhotos.forEach((photo) => {
+    content.push({
+      type: "input_text",
+      text: `사진 ${photo.index}\n파일명: ${photo.name}\n기존 표시명: ${photo.caption || "없음"}\n사용자 메모: ${photo.note || "없음"}\n기존 분류: ${photo.role || "없음"}`,
+    });
+    content.push({
+      type: "input_image",
+      image_url: photo.imageUrl,
+      detail: "high",
+    });
+  });
+
+  return {
+    model,
+    input: [
+      {
+        role: "user",
+        content,
+      },
+    ],
+    max_output_tokens: 12000,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "naver_blog_post",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "naver_post", "tags", "thumbnail_title", "thumbnail_ribbon", "photo_plan"],
+          properties: {
+            title: { type: "string" },
+            naver_post: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            thumbnail_title: { type: "string" },
+            thumbnail_ribbon: { type: "string" },
+            photo_plan: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["photo", "caption", "reason"],
+                properties: {
+                  photo: { type: "number" },
+                  caption: { type: "string" },
+                  reason: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function makeOpenAIPrompt(input, aiPhotos) {
+  const menus = input.menus.map((menu) => `- ${menu.name}${menu.local ? `(${menu.local})` : ""}: ${menu.note || "메모 없음"}`).join("\n") || "메뉴 메모 없음";
+  const experience = input.experience.map((item) => `- ${item}`).join("\n") || "경험 메모 없음";
+  const keywords = [...input.keywordsKo, ...input.keywordsGoogle].join(", ");
+  const photoNumbers = aiPhotos.map((photo) => `사진 ${photo.index}`).join(", ") || "사진 없음";
+  const extraInstruction = $("aiInstructionInput").value.trim();
+
+  return `
+너는 한국어 네이버 블로그 맛집 글을 쓰는 전문 작가야.
+사용자의 실제 경험을 바탕으로, AI가 쓴 것처럼 딱딱하지 않게 1인칭으로 자연스럽게 써줘.
+
+[목표]
+- 구글문서로 사람이 함께 다듬은 최종 원고처럼 자연스럽고 긴 네이버 블로그 포스팅을 만든다.
+- 사진을 직접 보고 글 흐름에 맞는 위치에 넣는다.
+- 사진 속 메뉴명이 확실하지 않으면 사테, 우당 바카르, 자헤 마두처럼 단정하지 않는다.
+- 확실하지 않은 사진은 "테이블에 나온 음식", "같이 주문한 메뉴", "내부 분위기"처럼 안전하게 표현한다.
+- 사진 설명은 사진 바로 아래에 1문장으로 붙인다.
+
+[입력 정보]
+주제: ${input.topic}
+장소: ${input.place}
+방문 날짜: ${input.date}
+그날 상황: ${input.situation}
+말투 참고: ${input.voice}
+추가 요청: ${extraInstruction || "없음"}
+
+[경험 메모]
+${experience}
+
+[먹은 메뉴]
+${menus}
+
+[SEO 키워드]
+${keywords}
+
+[사용 가능한 사진 번호]
+${photoNumbers}
+
+[원고 규칙]
+- naver_post는 제목부터 시작하는 완성 원고로 작성한다.
+- 한국어 중심으로 쓰고, 필요한 곳에 Pesta Kebun, Kokas, Kota Kasablanka 같은 검색어를 자연스럽게 넣는다.
+- 글은 최소 3500자 이상을 목표로 한다.
+- 소제목은 너무 과장하지 말고 자연스럽게 쓴다.
+- 사진을 넣을 위치에는 반드시 [사진 1: 짧은 캡션] 형식을 사용한다.
+- [사진 N: 캡션] 바로 다음 줄에는 사진을 설명하는 자연스러운 1문장을 쓴다.
+- 사진 번호는 제공된 사진 번호만 사용한다.
+- 모든 사진을 억지로 쓰지 말고, 블로그에 어울리는 사진만 골라 쓴다.
+- 글 끝에는 FAQ와 태그를 포함한다.
+- 태그는 18개 이하로 추천한다.
+
+반드시 JSON만 반환해줘.
+`.trim();
+}
+
+function extractOpenAIText(data) {
+  if (typeof data.output_text === "string") return data.output_text;
+  const chunks = [];
+  (data.output || []).forEach((item) => {
+    (item.content || []).forEach((content) => {
+      if (typeof content.text === "string") chunks.push(content.text);
+      if (typeof content.output_text === "string") chunks.push(content.output_text);
+    });
+  });
+  return chunks.join("\n").trim();
+}
+
+function parseOpenAIJson(text) {
+  if (!text) throw new Error("OpenAI 응답이 비어 있어요.");
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("OpenAI 응답을 원고 형식으로 읽지 못했어요.");
+  }
+}
+
+function applyOpenAIResult(result, input) {
+  const title = String(result.title || "").trim();
+  const post = String(result.naver_post || "").trim();
+  if (!post) throw new Error("AI가 원고 본문을 보내지 않았어요.");
+
+  const tags = dietTags((result.tags || []).map((tag) => String(tag).trim()).filter(Boolean), 18);
+  state.tags = tags.length ? tags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`) : makeTags(input);
+  state.naverPost = post;
+  state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
+  state.titleCandidates = unique([
+    title,
+    ...makeTitleCandidates(input).map((item) => item.text),
+  ].filter(Boolean)).slice(0, 5).map((text, index) => ({ type: index === 0 ? "AI 추천" : "후보", text }));
+
+  if (result.thumbnail_title) $("thumbTitleInput").value = String(result.thumbnail_title).trim();
+  if (result.thumbnail_ribbon) $("thumbRibbonInput").value = String(result.thumbnail_ribbon).trim();
+  $("postEditor").value = state.naverPost;
+  $("blogspotEditor").value = state.blogspotPost;
+  $("tagEditor").value = state.tags.join(" ");
+  renderTitleCandidates();
+  drawThumbnail();
+  refreshReports();
+  activateTab("naver");
 }
 
 function makeTitleCandidates(input) {
