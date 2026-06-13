@@ -3186,7 +3186,7 @@ async function copyStyledPost() {
   cleanPreview.classList.remove("is-editing");
   applyInlinePostStyles(cleanPreview);
   const html = `
-    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
+    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.82;">
       ${cleanPreview.innerHTML}
     </article>
   `;
@@ -3210,17 +3210,17 @@ function applyInlinePostStyles(root) {
     element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.36;font-weight:800;letter-spacing:0;");
   });
   root.querySelectorAll("h2").forEach((element) => {
-    element.setAttribute("style", "margin:48px 0 19px;padding:0 0 9px 16px;border-left:5px solid #c7aa68;border-bottom:0;background:linear-gradient(#d8c28b,#d8c28b) 16px 100% / 68px 2px no-repeat;color:#173f36;font-size:23.5px;line-height:1.36;font-weight:800;letter-spacing:0;");
+    element.setAttribute("style", "margin:46px 0 22px;padding:0 0 5px 16px;border-left:5px solid #c7aa68;border-bottom:0;background:transparent;color:#173f36;font-size:23.5px;line-height:1.42;font-weight:800;letter-spacing:0;text-decoration-line:underline;text-decoration-color:#d8c28b;text-decoration-thickness:2px;text-underline-offset:8px;");
   });
   root.querySelectorAll("h3").forEach((element) => {
     element.setAttribute("style", "margin:28px 0 12px;color:#253f34;font-size:19px;line-height:1.42;font-weight:750;letter-spacing:0;");
   });
   root.querySelectorAll("p").forEach((element) => {
-    const base = "margin:0 0 17px;color:#202824;font-size:16.5px;line-height:1.86;letter-spacing:0;";
+    const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.82;letter-spacing:0;";
     const toneColor = inlineParagraphToneColor(element);
     const colorBase = toneColor ? base.replace("color:#202824;", `color:${toneColor};`) : base;
     if (element.classList.contains("is-important")) {
-      element.setAttribute("style", `${colorBase}margin-top:0;margin-bottom:17px;background:transparent;font-weight:600;`);
+      element.setAttribute("style", `${colorBase}margin-top:0;margin-bottom:18px;background:transparent;font-weight:600;`);
     } else if (element.classList.contains("is-short-note")) {
       element.setAttribute("style", `${colorBase}font-weight:600;`);
     } else {
@@ -3228,10 +3228,10 @@ function applyInlinePostStyles(root) {
     }
   });
   root.querySelectorAll("ul").forEach((element) => {
-    element.setAttribute("style", "margin:4px 0 20px;padding:13px 18px 13px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.86;");
+    element.setAttribute("style", "margin:4px 0 22px;padding:13px 18px 13px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.82;");
   });
   root.querySelectorAll("li").forEach((element) => {
-    element.setAttribute("style", "margin:4px 0;line-height:1.86;");
+    element.setAttribute("style", "margin:4px 0;line-height:1.82;");
   });
   root.querySelectorAll(".preview-keyword").forEach((element) => {
     element.setAttribute("style", "color:#17483b;font-weight:800;");

@@ -461,7 +461,7 @@ textarea {
   color: #292f2b;
   font-family: Arial, "Malgun Gothic", sans-serif;
   font-size: 16.5px;
-  line-height: 1.84;
+  line-height: 1.82;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
@@ -470,7 +470,7 @@ textarea {
   background: #fffefa;
   color: #202824;
   font-size: 16.8px;
-  line-height: 1.86;
+  line-height: 1.82;
 }
 
 .post-preview.is-editing {
@@ -514,28 +514,32 @@ textarea {
 
 .post-preview h2 {
   position: relative;
-  margin: 48px auto 19px;
-  padding: 0 0 9px 16px;
+  margin: 46px auto 22px;
+  padding: 0 0 5px 16px;
   border-left: 5px solid #c7aa68;
   border-bottom: 0;
-  background: linear-gradient(#d8c28b, #d8c28b) 16px 100% / 68px 2px no-repeat;
+  background: transparent;
   color: #173f36;
   font-size: 22.5px;
-  line-height: 1.36;
+  line-height: 1.42;
   font-weight: 800;
   letter-spacing: 0;
+  text-decoration-line: underline;
+  text-decoration-color: #d8c28b;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
 }
 
 .post-preview.is-polished h2 {
-  margin-top: 48px;
-  margin-bottom: 19px;
-  padding: 0 0 9px 16px;
+  margin-top: 46px;
+  margin-bottom: 22px;
+  padding: 0 0 5px 16px;
   border-left: 5px solid #c7aa68;
   border-bottom: 0;
-  background: linear-gradient(#d8c28b, #d8c28b) 16px 100% / 68px 2px no-repeat;
+  background: transparent;
   color: #173f36;
   font-size: 23.5px;
-  line-height: 1.36;
+  line-height: 1.42;
 }
 
 .post-preview h3 {
@@ -560,8 +564,8 @@ textarea {
 }
 
 .post-preview.is-polished p {
-  margin-bottom: 17px;
-  line-height: 1.86;
+  margin-bottom: 18px;
+  line-height: 1.82;
 }
 
 .post-preview p.is-short-note {
@@ -571,13 +575,13 @@ textarea {
 
 .post-preview p.is-important {
   margin-top: 0;
-  margin-bottom: 17px;
+  margin-bottom: 18px;
   padding: 0;
   border: 0;
   background: transparent;
   color: #1e3d32;
   font-weight: 600;
-  line-height: 1.86;
+  line-height: 1.82;
 }
 
 .post-preview.is-polished p.tone-menu {
@@ -638,20 +642,20 @@ textarea {
 
 .post-preview li {
   margin: 4px 0;
-  line-height: 1.68;
+  line-height: 1.82;
 }
 
 .post-preview.is-polished ul {
   margin-top: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   padding: 13px 18px 13px 30px;
   border-left: 3px solid #d7c28a;
-  line-height: 1.86;
+  line-height: 1.82;
 }
 
 .post-preview.is-polished li {
   margin: 4px 0;
-  line-height: 1.86;
+  line-height: 1.82;
 }
 
 .preview-photo {
@@ -944,11 +948,10 @@ textarea {
   .post-preview h2 {
     font-size: 20px;
     margin-top: 36px;
-    margin-bottom: 15px;
+    margin-bottom: 18px;
     padding-left: 13px;
     border-left-width: 4px;
-    background-position: 13px 100%;
-    background-size: 54px 2px;
+    text-underline-offset: 7px;
   }
 
   .post-preview h3 {
