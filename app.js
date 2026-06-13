@@ -3221,22 +3221,39 @@ async function copyStyledPost() {
 }
 
 async function exportToGoogleDocs() {
-  const docsWindow = window.open("https://docs.new", "_blank", "noopener");
+  const button = $("exportGoogleDocsBtn");
+  const originalLabel = button?.textContent || "구글문서 복사+열기";
+  if (button) {
+    button.disabled = true;
+    button.classList.add("is-busy");
+    button.textContent = "복사 중";
+  }
   const { html, plain } = buildPostExportHtml();
   try {
+    setAiStatus("구글문서용으로 사진 포함 원고를 먼저 복사하는 중이야.");
     const copiedRich = await copyRichHtml(html, plain);
     if (!copiedRich) {
       downloadGoogleDocsHtml(html);
       setAiStatus("브라우저가 사진 포함 복사를 지원하지 않아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
       return;
     }
+    if (button) button.textContent = "복사 완료";
+    const docsWindow = window.open("https://docs.new", "_blank", "noopener");
     const openGuide = docsWindow
-      ? "새로 열린 Google Docs 빈 문서에 Ctrl+V로 붙여넣으면 돼."
-      : "Google Docs에서 새 문서를 열고 Ctrl+V로 붙여넣으면 돼.";
-    setAiStatus(`구글문서용으로 사진 포함 원고를 복사했어. ${openGuide}`);
+      ? "새로 열린 빈 문서에서 Ctrl+V를 눌러 붙여넣어줘."
+      : "팝업이 막혔으면 docs.new를 직접 열고 Ctrl+V를 눌러 붙여넣어줘.";
+    setAiStatus(`구글문서용 복사 완료. ${openGuide} Google Docs에는 보안상 자동 붙여넣기는 안 돼.`);
   } catch (error) {
     downloadGoogleDocsHtml(html);
     setAiStatus("브라우저가 사진 포함 복사를 막아서 google-docs-post.html 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.", true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("is-busy");
+      setTimeout(() => {
+        button.textContent = originalLabel;
+      }, 900);
+    }
   }
 }
 
