@@ -245,7 +245,7 @@ function autoMatchPhotosFromButton() {
   autoMatchPhotos(getInput(), true);
   renderPhotos();
   generateAll();
-  updatePhotoStatus(`${state.photos.length}장 중 대표컷만 골라 원고 문단에 맞춰 다시 매치했어.`);
+  updatePhotoStatus(`${state.photos.length}장 중 대표컷만 골랐어. 사진 설명은 직접 쓴 메모가 있을 때만 반영돼.`);
 }
 
 function autoMatchPhotos(input, force = false) {
@@ -305,7 +305,7 @@ function autoMatchPhotos(input, force = false) {
 
     if ((force && isGenericPhotoCaption(photo.caption)) || isGenericPhotoCaption(photo.caption) || photo.autoMatched) photo.caption = caption;
     if (target !== "auto" || (force && photo.role === "body") || photo.role === "body" || photo.autoMatched) photo.role = nextRole;
-    if (!photo.note || isGenericPhotoNote(photo.note) || photo.autoMatched) photo.note = note;
+    if (!photo.userEdited && (!photo.note || isGenericPhotoNote(photo.note) || photo.autoMatched)) photo.note = "";
     photo.autoMatched = true;
   });
 }
@@ -509,8 +509,8 @@ function renderPhotos() {
           <strong>${escapeHtml(photo.caption)}</strong>
           <span>${escapeHtml(photoAnalysisSummary(photo))}</span>
         </div>
-        <input data-photo-field="caption" value="${escapeAttr(photo.caption)}" aria-label="사진 설명">
-        <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="이 사진에 대한 경험 메모">
+        <input data-photo-field="caption" value="${escapeAttr(photo.caption)}" aria-label="사진 표시명">
+        <input data-photo-field="note" value="${escapeAttr(photo.note)}" placeholder="확실한 내용이 있을 때만 메모를 써도 돼요">
       </div>
     </div>
   `).join("");
@@ -667,11 +667,12 @@ function makePhotoReflectionSection(input) {
   if (!plan.length) return [];
   const linesOut = [
     "본문에 넣을 사진",
-    "아래 사진들은 원고에 넣을 위치를 먼저 잡아둔 거야. 블로그에 올릴 때 이 순서대로 사진을 끼워 넣으면 흐름이 자연스러워.",
+    "아래 사진들은 원고에 넣을 위치만 잡아둔 거야. 사진 설명을 억지로 붙이지 않고, 글 흐름 사이에 자연스럽게 보여주는 방식이야.",
   ];
   plan.forEach((photo) => {
-    linesOut.push(`[사진 ${photo.index}: ${photo.caption}]`);
-    linesOut.push(photo.note || photoPlacementNote(photo, input));
+    linesOut.push(photoMarker(photo));
+    const note = manualPhotoNote(photo);
+    if (note) linesOut.push(note);
   });
   return linesOut;
 }
@@ -693,8 +694,9 @@ function makeAtmosphereSection(input) {
   if (interiorPhotos.length) {
     linesOut.push("");
     interiorPhotos.forEach((photo) => {
-      linesOut.push(`[사진 ${photo.index}: ${photo.caption}]`);
-      linesOut.push(photo.note || photoNarrativeNote(photo.role, photo.caption, photo.matchedMenu, input));
+      linesOut.push(photoMarker(photo));
+      const note = manualPhotoNote(photo);
+      if (note) linesOut.push(note);
     });
   }
 
@@ -795,9 +797,9 @@ function photoLinesForMenu(menu, input) {
     .slice(0, settings.menuPlacement);
 
   return matches.flatMap((photo) => [
-    `[사진 ${photo.index}: ${photo.caption}]`,
-    photo.note || photoNarrativeNote(photo.role, photo.caption, menu, input),
-  ]);
+    photoMarker(photo),
+    manualPhotoNote(photo),
+  ].filter(Boolean));
 }
 
 function photoLinesForGeneralFood(input) {
@@ -809,9 +811,27 @@ function photoLinesForGeneralFood(input) {
     .slice(0, Math.min(6, settings.menuPlacement * 2));
 
   return matches.flatMap((photo) => [
-    `[사진 ${photo.index}: ${photo.caption}]`,
-    photo.note || photoNarrativeNote(photo.role, photo.caption, null, input),
-  ]);
+    photoMarker(photo),
+    manualPhotoNote(photo),
+  ].filter(Boolean));
+}
+
+function photoMarker(photo) {
+  const caption = trustedPhotoCaption(photo);
+  return caption ? `[사진 ${photo.index}: ${caption}]` : `[사진 ${photo.index}]`;
+}
+
+function trustedPhotoCaption(photo) {
+  if (!photo) return "";
+  const caption = String(photo.caption || "").trim();
+  if (!caption || isGenericPhotoCaption(caption)) return "";
+  return photo.userEdited ? caption : "";
+}
+
+function manualPhotoNote(photo) {
+  const note = String(photo?.note || "").trim();
+  if (!note || isGenericPhotoNote(note)) return "";
+  return photo?.userEdited ? note : "";
 }
 
 function photoMatchesMenu(photo, menu) {
@@ -1530,14 +1550,14 @@ function renderPostPreview(text, tags = []) {
       continue;
     }
 
-    const photoMatch = line.match(/^\[사진\s+(\d+):\s*(.+?)\]$/);
+    const photoMatch = line.match(/^\[사진\s+(\d+)(?::\s*(.+?))?\]$/);
     if (photoMatch) {
       closeList();
       const photoIndex = Number(photoMatch[1]) - 1;
       const photo = state.photos[photoIndex];
       const nextLine = (linesRaw[i + 1] || "").trim();
-      const caption = photoMatch[2];
-      const note = shouldUseLineAsPhotoNote(nextLine) ? nextLine : "";
+      const caption = photoMatch[2] || "";
+      const note = caption && shouldUseLineAsPhotoNote(nextLine) ? nextLine : "";
       if (note) i += 1;
       blocks.push(renderPreviewPhoto(photo, caption, note));
       continue;
@@ -1595,16 +1615,24 @@ function normalizePreviewLine(line) {
 
 function renderPreviewPhoto(photo, caption, note) {
   const className = previewPhotoClass(photo);
+  const safeCaption = String(caption || "").trim();
+  const safeNote = String(note || "").trim();
+  const altText = safeCaption || `${getInput().place || getInput().topic || "블로그"} 사진`;
   if (!photo?.dataUrl) {
-    return `<figure class="${className}"><div>${escapeHtml(caption)}</div>${note ? `<figcaption>${escapeHtml(note)}</figcaption>` : ""}</figure>`;
+    return `<figure class="${className} is-missing"><div>${escapeHtml(safeCaption || "사진")}</div>${safeNote ? `<figcaption>${escapeHtml(safeNote)}</figcaption>` : ""}</figure>`;
   }
+  const captionHtml = safeCaption || safeNote
+    ? `
+      <figcaption>
+        ${safeCaption ? `<strong>${escapeHtml(safeCaption)}</strong>` : ""}
+        ${safeNote ? `<span>${escapeHtml(safeNote)}</span>` : ""}
+      </figcaption>
+    `
+    : "";
   return `
     <figure class="${className}">
-      <img src="${photo.dataUrl}" alt="${escapeHtml(caption)}">
-      <figcaption>
-        <strong>${escapeHtml(caption)}</strong>
-        ${note ? `<span>${escapeHtml(note)}</span>` : ""}
-      </figcaption>
+      <img src="${photo.dataUrl}" alt="${escapeHtml(altText)}">
+      ${captionHtml}
     </figure>
   `;
 }
@@ -1735,8 +1763,9 @@ function renderPhotoPlanReport() {
   $("photoPlanReport").innerHTML = selected.length
     ? [
       `<p class="metric-row status-good">원고에 넣을 대표 사진 ${selected.length}장${skipped.length ? `, 중복/보조 사진 ${skipped.length}장 제외` : ""}</p>`,
-      `<ul class="report-list">${selected.map((photo) => `<li>사용: 사진 ${photo.index}: ${escapeHtml(photo.caption)} / ${escapeHtml(photoRoleLabel(photo.role))}<br>${escapeHtml(photo.note)}<br>alt: ${escapeHtml(photo.alt)}</li>`).join("")}</ul>`,
-      skipped.length ? `<ul class="report-list">${skipped.map((photo) => `<li>제외: 사진 ${photo.index}: ${escapeHtml(photo.caption)}<br>${escapeHtml(photo.skipReason)}</li>`).join("")}</ul>` : "",
+      `<p class="metric-row">사진은 기본적으로 설명 없이 배치해요. 직접 쓴 사진 메모가 있을 때만 캡션/문장을 반영해요.</p>`,
+      `<ul class="report-list">${selected.map((photo) => `<li>사용: 사진 ${photo.index} / ${escapeHtml(photoRoleLabel(photo.role))}<br>${escapeHtml(manualPhotoNote(photo) || "자동 설명 없음")}</li>`).join("")}</ul>`,
+      skipped.length ? `<ul class="report-list">${skipped.map((photo) => `<li>제외: 사진 ${photo.index}<br>${escapeHtml(photo.skipReason)}</li>`).join("")}</ul>` : "",
     ].join("")
     : `<p class="metric-row">사진을 올리면 자동 배치 계획이 생겨요.</p>`;
 }
@@ -1770,7 +1799,7 @@ function insertSnippet(type) {
   const snippets = {
     h2: "\n\n새 단락 제목\n",
     h3: "\n\n메뉴명\n이 메뉴는 내 기준으로...\n",
-    photo: "\n\n[사진: 설명]\n사진 설명을 여기에 써줘.\n",
+    photo: "\n\n[사진 1]\n",
     faq: "\n\nQ. 궁금한 점?\nA. 내 기준으로는...\n",
   };
   insertAtCursor(editor, snippets[type] || "");
