@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-openai-key-check">
+  <link rel="stylesheet" href="styles.css?v=20260613-openai-final-polish">
 </head>
 <body>
   <main class="app-shell">
@@ -154,13 +154,12 @@ Casa Residence에서 가까워서 들르기 편함
         </div>
         <label class="stacked">
           <span>AI 요청 메모</span>
-          <textarea id="aiInstructionInput" rows="3">구글문서에 정리했던 것처럼, 내 경험을 바탕으로 자연스러운 네이버 블로그 후기처럼 써줘. 사진은 직접 보고 어울리는 위치에 넣고, 확실하지 않은 메뉴명은 단정하지 마.</textarea>
+          <textarea id="aiInstructionInput" rows="3">구글문서에 정리했던 것처럼, 내 경험과 말투를 바탕으로 바로 올릴 수 있는 최종 네이버 블로그 후기처럼 써줘. 제목, 소제목, 문단 구분, 사진 위치, 사진 설명까지 완성해줘. 사진은 직접 보고 어울리는 위치에 넣고, 확실하지 않은 메뉴명은 단정하지 마.</textarea>
         </label>
         <p id="aiStatus" class="metric-row">API 키는 깃허브에 저장되지 않고 이 브라우저에만 저장돼요.</p>
       </section>
 
       <div class="action-row">
-        <button id="generateBtn" class="primary-btn" type="button">글 생성</button>
         <button id="refreshReportBtn" class="secondary-btn" type="button">수정 내용 분석</button>
         <button id="dietTagsBtn" class="secondary-btn" type="button">태그 정리</button>
       </div>
@@ -181,6 +180,7 @@ Casa Residence에서 가까워서 들르기 편함
           <button type="button" data-insert="photo">사진 위치</button>
           <button type="button" data-insert="faq">FAQ</button>
           <button type="button" id="fixAiBtn">AI 느낌 줄이기</button>
+          <button type="button" id="copyStyledPostBtn">꾸민 원고 복사</button>
           <button type="button" id="copyPostBtn">원고 복사</button>
           <button type="button" id="downloadPostBtn">원고 저장</button>
         </div>
@@ -246,11 +246,18 @@ Casa Residence에서 가까워서 들르기 편함
             <h2>사진 배치</h2>
             <div id="photoPlanReport"></div>
           </section>
+          <section class="report-block wide">
+            <div class="section-head compact-head">
+              <h2>AI 검색 검수</h2>
+              <button id="aiSearchReviewBtn" class="secondary-btn" type="button">AI 검색 후 수정 반영</button>
+            </div>
+            <div id="aiSearchReport"></div>
+          </section>
         </div>
       </section>
     </section>
   </main>
 
-  <script src="app.js?v=20260613-openai-key-check"></script>
+  <script src="app.js?v=20260613-openai-final-polish"></script>
 </body>
 </html>

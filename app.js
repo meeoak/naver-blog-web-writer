@@ -6,6 +6,8 @@ const state = {
   naverPost: "",
   blogspotPost: "",
   tags: [],
+  aiSearchReport: [],
+  aiSearchSources: [],
   voicePresets: loadVoicePresets(),
 };
 
@@ -59,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindEvents() {
-  $("generateBtn").addEventListener("click", generateAll);
   $("refreshReportBtn").addEventListener("click", refreshFromEditor);
   $("dietTagsBtn").addEventListener("click", dietTagsFromEditor);
   $("photoInput").addEventListener("change", handlePhotos);
@@ -77,10 +78,12 @@ function bindEvents() {
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
   $("downloadThumbBtn").addEventListener("click", downloadThumbnail);
   $("copyPostBtn").addEventListener("click", () => copyText($("postEditor").value));
+  $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
   $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
   $("downloadPostBtn").addEventListener("click", () => downloadText("naver_post.md", $("postEditor").value));
   $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
   $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
+  $("aiSearchReviewBtn").addEventListener("click", runAIWebReview);
   $("fixAiBtn").addEventListener("click", fixAiSmell);
   $("tagEditor").addEventListener("input", () => {
     state.tags = parseCommaOrSpaceTags($("tagEditor").value);
@@ -793,25 +796,33 @@ function makeOpenAIPrompt(input, aiPhotos) {
   const keywords = [...input.keywordsKo, ...input.keywordsGoogle].join(", ");
   const photoNumbers = aiPhotos.map((photo) => `사진 ${photo.index}`).join(", ") || "사진 없음";
   const extraInstruction = $("aiInstructionInput").value.trim();
+  const voiceSamples = [input.voice, ...state.voicePresets].filter(Boolean).slice(0, 6).map((item) => `- ${item}`).join("\n") || "- 담백한 1인칭 후기체";
 
   return `
 너는 한국어 네이버 블로그 맛집 글을 쓰는 전문 작가야.
 사용자의 실제 경험을 바탕으로, AI가 쓴 것처럼 딱딱하지 않게 1인칭으로 자연스럽게 써줘.
+아래 말투 샘플을 반드시 반영해서, 문장 끝과 표현 습관이 사용자 본인 글처럼 느껴지게 써줘.
 
 [목표]
 - 구글문서로 사람이 함께 다듬은 최종 원고처럼 자연스럽고 긴 네이버 블로그 포스팅을 만든다.
+- 사용자가 네이버 블로그에 바로 붙여 넣을 수 있는 최종 업로드용 원고를 만든다.
 - 사진을 직접 보고 글 흐름에 맞는 위치에 넣는다.
 - 사진 속 메뉴명이 확실하지 않으면 사테, 우당 바카르, 자헤 마두처럼 단정하지 않는다.
 - 확실하지 않은 사진은 "테이블에 나온 음식", "같이 주문한 메뉴", "내부 분위기"처럼 안전하게 표현한다.
 - 사진 설명은 사진 바로 아래에 1문장으로 붙인다.
+- 제목은 검색어가 들어가되 너무 광고처럼 보이지 않게 쓴다.
+- 소제목은 7~10개 정도로 나누고, 각 소제목 아래 문단은 2~5문단으로 정리한다.
+- 단락 사이에는 빈 줄을 넣어 모바일에서 읽기 쉽게 만든다.
 
 [입력 정보]
 주제: ${input.topic}
 장소: ${input.place}
 방문 날짜: ${input.date}
 그날 상황: ${input.situation}
-말투 참고: ${input.voice}
 추가 요청: ${extraInstruction || "없음"}
+
+[반드시 반영할 사용자 말투 샘플]
+${voiceSamples}
 
 [경험 메모]
 ${experience}
@@ -828,14 +839,17 @@ ${photoNumbers}
 [원고 규칙]
 - naver_post는 제목부터 시작하는 완성 원고로 작성한다.
 - 한국어 중심으로 쓰고, 필요한 곳에 Pesta Kebun, Kokas, Kota Kasablanka 같은 검색어를 자연스럽게 넣는다.
-- 글은 최소 3500자 이상을 목표로 한다.
+- 글은 최소 4500자 이상을 목표로 한다.
 - 소제목은 너무 과장하지 말고 자연스럽게 쓴다.
+- 소제목은 한 줄에 하나씩 쓰고, 바로 다음 줄부터 본문을 쓴다.
 - 사진을 넣을 위치에는 반드시 [사진 1: 짧은 캡션] 형식을 사용한다.
 - [사진 N: 캡션] 바로 다음 줄에는 사진을 설명하는 자연스러운 1문장을 쓴다.
 - 사진 번호는 제공된 사진 번호만 사용한다.
 - 모든 사진을 억지로 쓰지 말고, 블로그에 어울리는 사진만 골라 쓴다.
 - 글 끝에는 FAQ와 태그를 포함한다.
 - 태그는 18개 이하로 추천한다.
+- "추천드립니다", "만족스러운 경험", "도움이 되었으면 합니다" 같은 AI식 표현은 피한다.
+- 사용자의 실제 경험에서 나온 말처럼, 너무 단정하지 않고 "내 기준으로는", "나는", "이날은" 같은 표현을 자연스럽게 쓴다.
 
 반드시 JSON만 반환해줘.
 `.trim();
@@ -887,6 +901,168 @@ function applyOpenAIResult(result, input) {
   drawThumbnail();
   refreshReports();
   activateTab("naver");
+}
+
+async function runAIWebReview() {
+  const apiKey = normalizeOpenAIKey($("openaiKeyInput").value);
+  const model = $("aiModelInput").value.trim() || "gpt-5.5";
+  if (!apiKey || !isOpenAIKeyLike(apiKey)) {
+    setAiSearchReport("OpenAI API 키를 먼저 확인해줘. sk- 또는 sk-proj-로 시작하는 키가 필요해.", true);
+    activateTab("report");
+    return;
+  }
+
+  const input = getInput();
+  const currentPost = $("postEditor").value.trim();
+  if (!currentPost) {
+    setAiSearchReport("먼저 AI 원고를 생성하거나 원고를 입력해줘.", true);
+    activateTab("report");
+    return;
+  }
+
+  setAiSearchReport("AI가 웹 검색으로 장소명, 메뉴 표기, 방문 팁을 검수하는 중...");
+  activateTab("report");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(makeWebReviewRequestBody(model, input, currentPost)),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data?.error?.message || `AI 검색 검수 실패 (${response.status})`;
+      throw new Error(message);
+    }
+    const rawText = extractOpenAIText(data);
+    const result = parseOpenAIJson(rawText);
+    applyWebReviewResult(result, input, data);
+  } catch (error) {
+    setAiSearchReport(`AI 검색 검수 실패: ${friendlyOpenAIError(error.message)}`, true);
+  }
+}
+
+function makeWebReviewRequestBody(model, input, currentPost) {
+  return {
+    model,
+    tools: [
+      {
+        type: "web_search",
+        search_context_size: "low",
+      },
+    ],
+    tool_choice: "auto",
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: makeWebReviewPrompt(input, currentPost),
+          },
+        ],
+      },
+    ],
+    max_output_tokens: 10000,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "web_review_result",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["revised_post", "tags", "report", "sources"],
+          properties: {
+            revised_post: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            report: { type: "array", items: { type: "string" } },
+            sources: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "url"],
+                properties: {
+                  title: { type: "string" },
+                  url: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function makeWebReviewPrompt(input, currentPost) {
+  return `
+너는 네이버 블로그 맛집 글의 최종 검수자야.
+웹 검색을 사용해 장소명, 몰 이름, 메뉴 표기, 방문 팁, SEO 키워드를 확인하고 원고를 다듬어줘.
+
+[검수 대상]
+장소: ${input.place}
+주제: ${input.topic}
+키워드: ${[...input.keywordsKo, ...input.keywordsGoogle].join(", ")}
+
+[현재 원고]
+${currentPost}
+
+[작업]
+- 웹 검색으로 확인 가능한 정보만 보정한다.
+- 사용자의 실제 경험, 말투, 감상은 훼손하지 않는다.
+- 확실하지 않은 영업시간, 가격, 예약 정책은 단정하지 않는다.
+- 검색해서 얻은 일반 정보는 글 안에 자연스럽게 녹인다.
+- 제목, 소제목, 문단 구분, 태그를 바로 업로드 가능한 상태로 정리한다.
+- 사진 위치 표시 [사진 N: 캡션]은 유지한다.
+- 출처 URL은 sources에 담는다.
+
+반드시 JSON만 반환해줘.
+`.trim();
+}
+
+function applyWebReviewResult(result, input, rawData) {
+  const revisedPost = String(result.revised_post || "").trim();
+  if (!revisedPost) throw new Error("검색 검수 결과에 수정 원고가 없어요.");
+  const tags = dietTags((result.tags || []).map((tag) => String(tag).trim()).filter(Boolean), 18);
+  state.tags = tags.length ? tags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`) : state.tags;
+  state.naverPost = revisedPost;
+  state.blogspotPost = makeBlogspotPost(input, state.tags, state.naverPost);
+  $("postEditor").value = state.naverPost;
+  $("blogspotEditor").value = state.blogspotPost;
+  $("tagEditor").value = state.tags.join(" ");
+  state.aiSearchReport = result.report || [];
+  state.aiSearchSources = mergeWebSources(result.sources || [], rawData);
+  refreshReports();
+  setAiSearchReport("AI 검색 검수 완료. 검색 결과를 반영해 원고를 다시 정리했어.");
+  activateTab("naver");
+}
+
+function mergeWebSources(sources, data) {
+  const collected = [];
+  (sources || []).forEach((source) => {
+    if (source?.url) collected.push({ title: source.title || source.url, url: source.url });
+  });
+  (data.output || []).forEach((item) => {
+    (item.content || []).forEach((content) => {
+      (content.annotations || []).forEach((annotation) => {
+        const url = annotation.url || annotation.url_citation?.url;
+        const title = annotation.title || annotation.url_citation?.title || url;
+        if (url) collected.push({ title, url });
+      });
+    });
+  });
+  return unique(collected.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item)).slice(0, 8);
+}
+
+function setAiSearchReport(message, isError = false) {
+  const target = $("aiSearchReport");
+  if (!target) return;
+  target.innerHTML = `<p class="metric-row ${isError ? "status-warn" : "status-good"}">${escapeHtml(message)}</p>${renderStoredAiSearchReport()}`;
 }
 
 function makeTitleCandidates(input) {
@@ -1887,6 +2063,7 @@ function refreshReports() {
   renderAiReport(text);
   renderChecklist(text, tags);
   renderPhotoPlanReport();
+  renderAiSearchReport();
 }
 
 function renderPostPreview(text, tags = []) {
@@ -2235,6 +2412,24 @@ function renderPhotoPlanReport() {
     : `<p class="metric-row">사진을 올리면 자동 배치 계획이 생겨요.</p>`;
 }
 
+function renderAiSearchReport() {
+  const target = $("aiSearchReport");
+  if (!target) return;
+  target.innerHTML = renderStoredAiSearchReport() || `<p class="metric-row">AI 검색 검수를 실행하면 최신 정보 확인 결과와 반영 내용이 여기에 남아요.</p>`;
+}
+
+function renderStoredAiSearchReport() {
+  const report = state.aiSearchReport || [];
+  const sources = state.aiSearchSources || [];
+  const reportHtml = report.length
+    ? `<ul class="report-list">${report.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : "";
+  const sourceHtml = sources.length
+    ? `<div class="source-list"><strong>확인한 출처</strong>${sources.map((source) => `<a href="${escapeAttr(source.url)}" target="_blank" rel="noopener">${escapeHtml(source.title || source.url)}</a>`).join("")}</div>`
+    : "";
+  return `${reportHtml}${sourceHtml}`;
+}
+
 function dietTagsFromEditor() {
   const input = getInput();
   const current = parseCommaOrSpaceTags($("tagEditor").value);
@@ -2516,6 +2711,29 @@ function resetInputs() {
 
 function copyText(text) {
   navigator.clipboard.writeText(text);
+}
+
+async function copyStyledPost() {
+  refreshReports();
+  const preview = $("postPreview");
+  const html = `
+    <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #2f332f; font-size: 17px; line-height: 1.88;">
+      ${preview.innerHTML}
+    </article>
+  `;
+  const plain = $("postEditor").value;
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plain], { type: "text/plain" }),
+      }),
+    ]);
+    setAiStatus("꾸민 원고를 복사했어. 네이버 블로그 글쓰기 화면에 붙여넣어 봐.");
+  } catch (error) {
+    await navigator.clipboard.writeText(plain);
+    setAiStatus("브라우저가 꾸민 복사를 막아서 일반 원고로 복사했어.", true);
+  }
 }
 
 function downloadText(filename, text) {

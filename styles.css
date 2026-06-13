@@ -397,15 +397,15 @@ textarea {
   min-height: 520px;
   overflow: visible;
   margin-bottom: 12px;
-  padding: 36px 30px 46px;
+  padding: 42px 34px 52px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf9;
   box-shadow: var(--shadow);
-  color: #2f332f;
+  color: #292f2b;
   font-family: Arial, "Malgun Gothic", sans-serif;
   font-size: 17px;
-  line-height: 1.88;
+  line-height: 1.96;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
@@ -417,35 +417,38 @@ textarea {
 }
 
 .post-preview h1 {
-  margin: 0 auto 34px;
-  padding-bottom: 18px;
+  margin: 0 auto 38px;
+  padding-bottom: 20px;
   border-bottom: 1px solid #e4ded1;
-  color: var(--sage);
-  font-size: 28px;
+  color: #244735;
+  font-size: 30px;
   line-height: 1.42;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
 .post-preview h2 {
-  margin: 48px auto 18px;
-  padding: 2px 0 2px 13px;
-  border-left: 4px solid var(--gold);
+  margin: 54px auto 20px;
+  padding: 4px 0 4px 15px;
+  border-left: 5px solid var(--gold);
   color: #244735;
-  font-size: 23px;
+  font-size: 24px;
   line-height: 1.45;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
 .post-preview h3 {
-  margin: 34px auto 12px;
+  margin: 36px auto 14px;
   color: #263b30;
-  font-size: 19px;
+  font-size: 20px;
   line-height: 1.5;
+  font-weight: 750;
   letter-spacing: 0;
 }
 
 .post-preview p {
-  margin: 0 auto 15px;
+  margin: 0 auto 18px;
 }
 
 .post-preview a {
@@ -661,6 +664,33 @@ textarea {
 .report-list {
   margin: 0;
   padding-left: 18px;
+}
+
+.compact-head {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.compact-head h2 {
+  margin: 0;
+}
+
+.source-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.source-list strong {
+  color: var(--sage);
+}
+
+.source-list a {
+  color: var(--teal);
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .status-good {
