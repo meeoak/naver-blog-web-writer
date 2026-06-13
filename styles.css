@@ -230,6 +230,26 @@ textarea {
   flex-wrap: wrap;
 }
 
+.sub-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.sub-action-row span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sub-action-row button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
 .photo-list {
   display: grid;
   gap: 10px;

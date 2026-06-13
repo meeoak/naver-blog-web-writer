@@ -68,6 +68,7 @@ function bindEvents() {
   $("photoCaptionModeInput").addEventListener("change", generateAll);
   $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
   $("aiGenerateBtn").addEventListener("click", generateWithOpenAI);
+  $("clearOpenAIKeyBtn").addEventListener("click", clearOpenAIKey);
   ["openaiKeyInput", "aiModelInput", "aiInstructionInput"].forEach((id) => {
     $(id).addEventListener("input", saveOpenAISettings);
   });
@@ -108,12 +109,33 @@ function loadOpenAISettings() {
   if ($("openaiKeyInput")) $("openaiKeyInput").value = key;
   if ($("aiModelInput")) $("aiModelInput").value = model;
   if (instruction && $("aiInstructionInput")) $("aiInstructionInput").value = instruction;
+  if (key && !isOpenAIKeyLike(key)) {
+    localStorage.removeItem("naverBlogOpenAIKey");
+    if ($("openaiKeyInput")) $("openaiKeyInput").value = "";
+  }
 }
 
 function saveOpenAISettings() {
-  localStorage.setItem("naverBlogOpenAIKey", $("openaiKeyInput").value.trim());
+  const key = normalizeOpenAIKey($("openaiKeyInput").value);
+  if (key) localStorage.setItem("naverBlogOpenAIKey", key);
+  else localStorage.removeItem("naverBlogOpenAIKey");
   localStorage.setItem("naverBlogOpenAIModel", $("aiModelInput").value.trim() || "gpt-5.5");
   localStorage.setItem("naverBlogOpenAIInstruction", $("aiInstructionInput").value.trim());
+}
+
+function clearOpenAIKey() {
+  $("openaiKeyInput").value = "";
+  localStorage.removeItem("naverBlogOpenAIKey");
+  setAiStatus("저장된 API 키를 지웠어. platform.openai.com에서 새 키를 넣어줘.", false);
+}
+
+function normalizeOpenAIKey(value) {
+  return String(value || "").trim().replace(/^Bearer\s+/i, "");
+}
+
+function isOpenAIKeyLike(value) {
+  const key = normalizeOpenAIKey(value);
+  return /^sk-[A-Za-z0-9_-]{20,}$/.test(key) || /^sk-proj-[A-Za-z0-9_-]{20,}$/.test(key);
 }
 
 function activateTab(name) {
@@ -588,10 +610,14 @@ function generateAll() {
 }
 
 async function generateWithOpenAI() {
-  const apiKey = $("openaiKeyInput").value.trim();
+  const apiKey = normalizeOpenAIKey($("openaiKeyInput").value);
   const model = $("aiModelInput").value.trim() || "gpt-5.5";
   if (!apiKey) {
     setAiStatus("OpenAI API 키를 먼저 넣어줘. ChatGPT 로그인과 API 키는 별도야.", true);
+    return;
+  }
+  if (!isOpenAIKeyLike(apiKey)) {
+    setAiStatus("지금 입력된 값은 OpenAI API 키 형식이 아니야. 키는 보통 sk- 또는 sk-proj-로 시작해. 잘못 저장된 값은 'API 키 지우기'를 눌러 지워줘.", true);
     return;
   }
 
@@ -624,8 +650,19 @@ async function generateWithOpenAI() {
     applyOpenAIResult(result, input);
     setAiStatus(`AI 원고 생성 완료. 사진 ${aiPhotos.length}장을 보고 글 흐름에 맞춰 다시 썼어.`);
   } catch (error) {
-    setAiStatus(`AI 원고 생성 실패: ${error.message}`, true);
+    setAiStatus(`AI 원고 생성 실패: ${friendlyOpenAIError(error.message)}`, true);
   }
+}
+
+function friendlyOpenAIError(message) {
+  const text = String(message || "");
+  if (/incorrect api key|invalid api key/i.test(text)) {
+    return "API 키가 올바르지 않아. 'API 키 지우기'를 누른 뒤 platform.openai.com에서 새로 만든 sk- 키를 넣어줘.";
+  }
+  if (/model.*not.*found|does not exist|not have access/i.test(text)) {
+    return "현재 계정에서 이 모델을 사용할 수 없어요. 모델명을 계정에서 사용 가능한 모델로 바꿔줘.";
+  }
+  return text;
 }
 
 function setAiStatus(message, isError = false) {

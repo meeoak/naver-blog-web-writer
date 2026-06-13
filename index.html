@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-openai-writer">
+  <link rel="stylesheet" href="styles.css?v=20260613-openai-key-check">
 </head>
 <body>
   <main class="app-shell">
@@ -141,12 +141,16 @@ Casa Residence에서 가까워서 들르기 편함
         <div class="field-grid">
           <label>
             <span>OpenAI API 키</span>
-            <input id="openaiKeyInput" type="password" autocomplete="off" placeholder="sk-...">
+            <input id="openaiKeyInput" type="password" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="sk-...">
           </label>
           <label>
             <span>모델</span>
             <input id="aiModelInput" type="text" value="gpt-5.5">
           </label>
+        </div>
+        <div class="sub-action-row">
+          <button id="clearOpenAIKeyBtn" class="secondary-btn" type="button">API 키 지우기</button>
+          <span>sk- 또는 sk-proj-로 시작하는 OpenAI API 키를 넣어줘요.</span>
         </div>
         <label class="stacked">
           <span>AI 요청 메모</span>
@@ -247,6 +251,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260613-openai-writer"></script>
+  <script src="app.js?v=20260613-openai-key-check"></script>
 </body>
 </html>
