@@ -387,6 +387,16 @@ textarea {
   color: var(--sage);
 }
 
+.editor-toolbar button.is-busy {
+  border-color: #c8ad67;
+  background: #fbf8f1;
+  color: #71561d;
+}
+
+.editor-toolbar button.is-busy:disabled {
+  opacity: 1;
+}
+
 .editor-toolbar button:disabled {
   cursor: not-allowed;
   opacity: 0.46;
@@ -456,6 +466,13 @@ textarea {
   overflow-wrap: break-word;
 }
 
+.post-preview.is-polished {
+  background: #fffefa;
+  color: #202824;
+  font-size: 16.8px;
+  line-height: 1.94;
+}
+
 .post-preview.is-editing {
   outline: 3px solid rgba(47, 80, 60, 0.18);
   outline-offset: 4px;
@@ -488,6 +505,13 @@ textarea {
   letter-spacing: 0;
 }
 
+.post-preview.is-polished h1 {
+  margin-bottom: 38px;
+  color: #173f36;
+  font-size: 30px;
+  line-height: 1.38;
+}
+
 .post-preview h2 {
   margin: 46px auto 16px;
   padding: 3px 0 3px 14px;
@@ -499,6 +523,16 @@ textarea {
   letter-spacing: 0;
 }
 
+.post-preview.is-polished h2 {
+  margin-top: 48px;
+  margin-bottom: 18px;
+  padding: 7px 0 7px 18px;
+  border-left: 6px solid #c8ad67;
+  color: #173f36;
+  font-size: 23px;
+  line-height: 1.45;
+}
+
 .post-preview h3 {
   margin: 30px auto 12px;
   color: #263b30;
@@ -508,8 +542,39 @@ textarea {
   letter-spacing: 0;
 }
 
+.post-preview.is-polished h3 {
+  margin-top: 32px;
+  margin-bottom: 13px;
+  color: #253f34;
+  font-size: 19px;
+  line-height: 1.52;
+}
+
 .post-preview p {
   margin: 0 auto 15px;
+}
+
+.post-preview.is-polished p {
+  margin-bottom: 18px;
+  line-height: 1.94;
+}
+
+.post-preview p.is-short-note {
+  color: #28483b;
+  font-weight: 650;
+}
+
+.post-preview p.is-important {
+  padding: 12px 14px;
+  border-left: 4px solid #c8ad67;
+  background: #fbf8f1;
+  color: #1e3d32;
+  font-weight: 650;
+}
+
+.preview-keyword {
+  color: #17483b;
+  font-weight: 800;
 }
 
 .post-preview a {
@@ -529,6 +594,19 @@ textarea {
 .post-preview li {
   margin: 4px 0;
   line-height: 1.68;
+}
+
+.post-preview.is-polished ul {
+  margin-top: 4px;
+  margin-bottom: 28px;
+  padding: 14px 18px 14px 30px;
+  border-left: 3px solid #d7c28a;
+  line-height: 1.85;
+}
+
+.post-preview.is-polished li {
+  margin: 5px 0;
+  line-height: 1.78;
 }
 
 .preview-photo {
@@ -762,6 +840,11 @@ textarea {
 
 .status-warn {
   color: #a25d00;
+  font-weight: 700;
+}
+
+.status-working {
+  color: #71561d;
   font-weight: 700;
 }
 

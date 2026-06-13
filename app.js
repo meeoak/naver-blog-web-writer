@@ -9,6 +9,7 @@ const state = {
   aiSearchReport: [],
   aiSearchSources: [],
   voicePresets: loadVoicePresets(),
+  isPolished: false,
 };
 
 const aiSmells = [
@@ -610,6 +611,7 @@ function photoSceneLabel(photo) {
 
 function generateAll() {
   disableDirectPreviewEdit();
+  state.isPolished = false;
   const input = getInput();
   autoMatchPhotos(input, true);
   renderPhotos();
@@ -687,6 +689,7 @@ function setAiStatus(message, isError = false) {
   status.textContent = message;
   status.classList.toggle("status-warn", Boolean(isError));
   status.classList.toggle("status-good", !isError && /완료|저장|성공/.test(message));
+  status.classList.toggle("status-working", !isError && /중|진행|정리하고/.test(message));
 }
 
 async function prepareOpenAIPhotos(input) {
@@ -893,6 +896,7 @@ function parseOpenAIJson(text) {
 
 function applyOpenAIResult(result, input) {
   disableDirectPreviewEdit();
+  state.isPolished = false;
   const title = String(result.title || "").trim();
   const post = String(result.naver_post || "").trim();
   if (!post) throw new Error("AI가 원고 본문을 보내지 않았어요.");
@@ -2088,6 +2092,7 @@ function renderPostPreview(text, tags = []) {
   const preview = $("postPreview");
   if (!preview) return;
   if (isPreviewEditing()) return;
+  preview.classList.toggle("is-polished", Boolean(state.isPolished));
   const linesRaw = text.split(/\r?\n/);
   const blocks = [];
   let listOpen = false;
@@ -2129,36 +2134,64 @@ function renderPostPreview(text, tags = []) {
         blocks.push("<ul>");
         listOpen = true;
       }
-      blocks.push(`<li>${escapeHtml(line.replace(/^[·-]\s*/, ""))}</li>`);
+      blocks.push(`<li>${formatPreviewInline(line.replace(/^[·-]\s*/, ""))}</li>`);
       continue;
     }
 
     closeList();
 
     if (!firstTextSeen) {
-      blocks.push(`<h1>${escapeHtml(line)}</h1>`);
+      blocks.push(`<h1>${formatPreviewInline(line)}</h1>`);
       firstTextSeen = true;
       continue;
     }
 
     if (isPreviewHeading(line)) {
-      blocks.push(`<h2>${escapeHtml(line)}</h2>`);
+      blocks.push(`<h2>${formatPreviewInline(line)}</h2>`);
     } else if (isPreviewSubheading(line)) {
-      blocks.push(`<h3>${escapeHtml(line)}</h3>`);
+      blocks.push(`<h3>${formatPreviewInline(line)}</h3>`);
     } else if (/^Q\./.test(line)) {
-      blocks.push(`<h3>${escapeHtml(line)}</h3>`);
+      blocks.push(`<h3>${formatPreviewInline(line)}</h3>`);
     } else if (/^https?:\/\//.test(line)) {
       blocks.push(`<p><a href="${escapeAttr(line)}" target="_blank" rel="noopener">${escapeHtml(line)}</a></p>`);
     } else if (line.startsWith("#")) {
       blocks.push(`<p class="preview-tags">${parseCommaOrSpaceTags(line).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</p>`);
     } else {
-      blocks.push(`<p>${escapeHtml(line)}</p>`);
+      const paragraphClass = previewParagraphClass(line);
+      blocks.push(`<p${paragraphClass ? ` class="${paragraphClass}"` : ""}>${formatPreviewInline(line)}</p>`);
     }
   }
 
   closeList();
   preview.innerHTML = blocks.join("");
   preview.contentEditable = "false";
+}
+
+function previewParagraphClass(line) {
+  const text = String(line || "");
+  if (text.length <= 46 && /(좋았|기억|추천|괜찮|편해|무난|대기|제일|다시|가까운|장점)/.test(text)) {
+    return "is-important";
+  }
+  if (/(이날 제일|운 좋게|대기 없이|다시 가도|한국인 입맛|실패하지|추천하고 싶은|기억에 남)/.test(text)) {
+    return "is-important";
+  }
+  if (text.length < 34) return "is-short-note";
+  return "";
+}
+
+function formatPreviewInline(text) {
+  const pattern = /(Pesta Kebun Kota Kasablanka|Pesta Kebun Kokas|Pesta Kebun|Kota Kasablanka|Casa Residence|Kokas|코카스|코타카사블랑카|사테|Sate|우당 바카르|Udang Bakar|자헤 마두|Jahe Madu|대기 없이|다시 가도|좋았어|기억에 남(?:았어|는|은)?|한국인 입맛|무난한 편|예약|방문 팁|제일 만족|추천)/g;
+  return String(text || "").split(pattern).map((part) => {
+    if (!part) return "";
+    if (isPreviewEmphasisToken(part)) {
+      return `<strong class="preview-keyword">${escapeHtml(part)}</strong>`;
+    }
+    return escapeHtml(part);
+  }).join("");
+}
+
+function isPreviewEmphasisToken(text) {
+  return /^(Pesta Kebun Kota Kasablanka|Pesta Kebun Kokas|Pesta Kebun|Kota Kasablanka|Casa Residence|Kokas|코카스|코타카사블랑카|사테|Sate|우당 바카르|Udang Bakar|자헤 마두|Jahe Madu|대기 없이|다시 가도|좋았어|기억에 남(?:았어|는|은)?|한국인 입맛|무난한 편|예약|방문 팁|제일 만족|추천)$/.test(text);
 }
 
 function shouldUseLineAsPhotoNote(line) {
@@ -2477,8 +2510,17 @@ function fixAiSmell() {
   refreshReports();
 }
 
-function polishPostLayout() {
+async function polishPostLayout() {
   syncPreviewEditsIfNeeded({ silent: true });
+  const button = $("polishPostBtn");
+  if (button) {
+    button.disabled = true;
+    button.classList.add("is-busy");
+    button.textContent = "꾸미는 중";
+  }
+  setAiStatus("글 꾸미기 중입니다. 제목, 소제목, 강조 문장과 행간을 정리하고 있어요.");
+  await delay(700);
+
   let text = $("postEditor").value || "";
   text = text
     .replace(/```(?:markdown|html|text)?/gi, "")
@@ -2523,9 +2565,15 @@ function polishPostLayout() {
   });
 
   $("postEditor").value = polished.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  state.isPolished = true;
   refreshReports();
   disableDirectPreviewEdit();
-  setAiStatus("글 꾸미기 완료. 소제목, 단락, 사진 위치 표시를 보기 좋게 정리했어.");
+  if (button) {
+    button.disabled = false;
+    button.classList.remove("is-busy");
+    button.textContent = "글 꾸미기";
+  }
+  setAiStatus("글 꾸미기 완료. 제목, 소제목, 강조색, 굵기, 행간을 최종 포스팅 느낌으로 정리했어.");
 }
 
 function pushBlank(lines) {
@@ -3010,6 +3058,7 @@ async function copyStyledPost() {
   cleanPreview.querySelectorAll("[contenteditable]").forEach((element) => element.removeAttribute("contenteditable"));
   cleanPreview.removeAttribute("contenteditable");
   cleanPreview.classList.remove("is-editing");
+  applyInlinePostStyles(cleanPreview);
   const html = `
     <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
       ${cleanPreview.innerHTML}
@@ -3028,6 +3077,43 @@ async function copyStyledPost() {
     await navigator.clipboard.writeText(plain);
     setAiStatus("브라우저가 꾸민 복사를 막아서 일반 원고로 복사했어.", true);
   }
+}
+
+function applyInlinePostStyles(root) {
+  root.querySelectorAll("h1").forEach((element) => {
+    element.setAttribute("style", "margin:0 0 34px;padding-bottom:18px;border-bottom:1px solid #e4ded1;color:#173f36;font-size:30px;line-height:1.38;font-weight:800;letter-spacing:0;");
+  });
+  root.querySelectorAll("h2").forEach((element) => {
+    element.setAttribute("style", "margin:48px 0 18px;padding:7px 0 7px 18px;border-left:6px solid #c8ad67;color:#173f36;font-size:23px;line-height:1.45;font-weight:800;letter-spacing:0;");
+  });
+  root.querySelectorAll("h3").forEach((element) => {
+    element.setAttribute("style", "margin:32px 0 13px;color:#253f34;font-size:19px;line-height:1.52;font-weight:750;letter-spacing:0;");
+  });
+  root.querySelectorAll("p").forEach((element) => {
+    const base = "margin:0 0 18px;color:#202824;font-size:16.5px;line-height:1.94;letter-spacing:0;";
+    if (element.classList.contains("is-important")) {
+      element.setAttribute("style", `${base}padding:12px 14px;border-left:4px solid #c8ad67;background:#fbf8f1;color:#1e3d32;font-weight:650;`);
+    } else if (element.classList.contains("is-short-note")) {
+      element.setAttribute("style", `${base}color:#28483b;font-weight:600;`);
+    } else {
+      element.setAttribute("style", base);
+    }
+  });
+  root.querySelectorAll("ul").forEach((element) => {
+    element.setAttribute("style", "margin:4px 0 28px;padding:14px 18px 14px 30px;border-left:3px solid #d7c28a;background:#fbf8f1;color:#26342d;font-size:16px;line-height:1.85;");
+  });
+  root.querySelectorAll("li").forEach((element) => {
+    element.setAttribute("style", "margin:5px 0;line-height:1.78;");
+  });
+  root.querySelectorAll(".preview-keyword").forEach((element) => {
+    element.setAttribute("style", "color:#17483b;font-weight:800;");
+  });
+  root.querySelectorAll("figcaption").forEach((element) => {
+    element.setAttribute("style", "margin:0 auto;padding:10px 4px 0;color:#5f665f;font-size:14px;line-height:1.58;text-align:center;");
+  });
+  root.querySelectorAll("img").forEach((element) => {
+    element.setAttribute("style", "display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px;");
+  });
 }
 
 function downloadText(filename, text) {
@@ -3077,4 +3163,8 @@ function debounce(fn, delay) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
   };
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
