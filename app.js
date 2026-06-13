@@ -79,15 +79,22 @@ function bindEvents() {
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
   $("downloadThumbBtn").addEventListener("click", downloadThumbnail);
-  $("copyPostBtn").addEventListener("click", () => copyText($("postEditor").value));
+  $("copyPostBtn").addEventListener("click", () => {
+    syncPreviewEditsIfNeeded({ silent: true });
+    copyText($("postEditor").value);
+  });
   $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
   $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
-  $("downloadPostBtn").addEventListener("click", () => downloadText("naver_post.md", $("postEditor").value));
+  $("downloadPostBtn").addEventListener("click", () => {
+    syncPreviewEditsIfNeeded({ silent: true });
+    downloadText("naver_post.md", $("postEditor").value);
+  });
   $("downloadBlogspotBtn").addEventListener("click", () => downloadText("blogspot_post.md", $("blogspotEditor").value));
   $("convertBlogspotBtn").addEventListener("click", convertCurrentNaverToBlogspot);
   $("aiSearchReviewBtn").addEventListener("click", runAIWebReview);
   $("polishPostBtn").addEventListener("click", polishPostLayout);
-  $("toggleEditorBtn").addEventListener("click", () => setEditorVisible(!$("editorShell").classList.contains("is-visible")));
+  $("toggleEditorBtn").addEventListener("click", toggleDirectPreviewEdit);
+  $("savePreviewEditBtn").addEventListener("click", () => savePreviewEdits());
   $("fixAiBtn").addEventListener("click", fixAiSmell);
   $("tagEditor").addEventListener("input", () => {
     state.tags = parseCommaOrSpaceTags($("tagEditor").value);
@@ -95,6 +102,7 @@ function bindEvents() {
   });
   $("postEditor").addEventListener("input", debounce(refreshReports, 250));
   $("postPreview").addEventListener("click", handlePreviewPhotoMove);
+  $("postPreview").addEventListener("input", markPreviewDirty);
   $("brandInput").addEventListener("input", drawThumbnail);
   $("accentInput").addEventListener("input", drawThumbnail);
   $("thumbTitleInput").addEventListener("input", drawThumbnail);
@@ -601,6 +609,7 @@ function photoSceneLabel(photo) {
 }
 
 function generateAll() {
+  disableDirectPreviewEdit();
   const input = getInput();
   autoMatchPhotos(input, true);
   renderPhotos();
@@ -883,6 +892,7 @@ function parseOpenAIJson(text) {
 }
 
 function applyOpenAIResult(result, input) {
+  disableDirectPreviewEdit();
   const title = String(result.title || "").trim();
   const post = String(result.naver_post || "").trim();
   if (!post) throw new Error("AI가 원고 본문을 보내지 않았어요.");
@@ -904,11 +914,11 @@ function applyOpenAIResult(result, input) {
   renderTitleCandidates();
   drawThumbnail();
   refreshReports();
-  setEditorVisible(false);
   activateTab("naver");
 }
 
 async function runAIWebReview() {
+  syncPreviewEditsIfNeeded({ silent: true });
   const apiKey = normalizeOpenAIKey($("openaiKeyInput").value);
   const model = $("aiModelInput").value.trim() || "gpt-5.5";
   if (!apiKey || !isOpenAIKeyLike(apiKey)) {
@@ -1545,6 +1555,7 @@ function makeBlogspotPost(input, tags, naverPost = "") {
 }
 
 function convertCurrentNaverToBlogspot() {
+  syncPreviewEditsIfNeeded({ silent: true });
   const input = getInput();
   const tags = parseCommaOrSpaceTags($("tagEditor").value || state.tags.join(" "));
   const naverPost = $("postEditor").value.trim() || makeNaverPost(input, tags);
@@ -2047,6 +2058,7 @@ function renderTitleCandidates() {
 }
 
 function applyTitle(title) {
+  syncPreviewEditsIfNeeded({ silent: true });
   const lines = $("postEditor").value.split(/\r?\n/);
   lines[0] = title;
   $("postEditor").value = lines.join("\n");
@@ -2054,6 +2066,7 @@ function applyTitle(title) {
 }
 
 function refreshFromEditor() {
+  syncPreviewEditsIfNeeded({ silent: true });
   refreshReports();
   drawThumbnail();
 }
@@ -2074,6 +2087,7 @@ function refreshReports() {
 function renderPostPreview(text, tags = []) {
   const preview = $("postPreview");
   if (!preview) return;
+  if (isPreviewEditing()) return;
   const linesRaw = text.split(/\r?\n/);
   const blocks = [];
   let listOpen = false;
@@ -2144,6 +2158,7 @@ function renderPostPreview(text, tags = []) {
 
   closeList();
   preview.innerHTML = blocks.join("");
+  preview.contentEditable = "false";
 }
 
 function shouldUseLineAsPhotoNote(line) {
@@ -2176,13 +2191,13 @@ function renderPreviewPhoto(photo, caption, note, photoNumber = 0) {
   const safeNote = String(note || "").trim();
   const altText = safeCaption || `${getInput().place || getInput().topic || "블로그"} 사진`;
   const controls = photoNumber ? `
-    <div class="photo-move-controls" aria-label="사진 위치 이동">
+    <div class="photo-move-controls" aria-label="사진 위치 이동" contenteditable="false">
       <button type="button" data-photo-move="up" data-photo-number="${photoNumber}">위로</button>
       <button type="button" data-photo-move="down" data-photo-number="${photoNumber}">아래로</button>
     </div>
   ` : "";
   if (!photo?.dataUrl) {
-    return `<figure class="${className} is-missing">${controls}<div>${escapeHtml(safeCaption || "사진")}</div>${safeNote ? `<figcaption>${escapeHtml(safeNote)}</figcaption>` : ""}</figure>`;
+    return `<figure class="${className} is-missing" data-photo-number="${photoNumber}">${controls}<div>${escapeHtml(safeCaption || "사진")}</div>${safeNote ? `<figcaption>${escapeHtml(safeNote)}</figcaption>` : ""}</figure>`;
   }
   const captionHtml = safeCaption || safeNote
     ? `
@@ -2193,9 +2208,9 @@ function renderPreviewPhoto(photo, caption, note, photoNumber = 0) {
     `
     : "";
   return `
-    <figure class="${className}">
+    <figure class="${className}" data-photo-number="${photoNumber}">
       ${controls}
-      <img src="${photo.dataUrl}" alt="${escapeHtml(altText)}">
+      <img src="${photo.dataUrl}" alt="${escapeHtml(altText)}" contenteditable="false" draggable="false">
       ${captionHtml}
     </figure>
   `;
@@ -2207,6 +2222,7 @@ function handlePreviewPhotoMove(event) {
   const photoNumber = Number(button.dataset.photoNumber);
   const direction = button.dataset.photoMove;
   if (!photoNumber || !direction) return;
+  syncPreviewEditsIfNeeded({ silent: true });
   movePhotoBlock(photoNumber, direction);
 }
 
@@ -2436,6 +2452,7 @@ function renderStoredAiSearchReport() {
 }
 
 function dietTagsFromEditor() {
+  syncPreviewEditsIfNeeded({ silent: true });
   const input = getInput();
   const current = parseCommaOrSpaceTags($("tagEditor").value);
   const next = dietTags([...current, ...makeTags(input)], 18);
@@ -2451,6 +2468,7 @@ function parseCommaOrSpaceTags(text) {
 }
 
 function fixAiSmell() {
+  syncPreviewEditsIfNeeded({ silent: true });
   let text = $("postEditor").value;
   aiSmells.forEach(([bad, good]) => {
     text = text.split(bad).join(good);
@@ -2460,6 +2478,7 @@ function fixAiSmell() {
 }
 
 function polishPostLayout() {
+  syncPreviewEditsIfNeeded({ silent: true });
   let text = $("postEditor").value || "";
   text = text
     .replace(/```(?:markdown|html|text)?/gi, "")
@@ -2505,7 +2524,7 @@ function polishPostLayout() {
 
   $("postEditor").value = polished.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   refreshReports();
-  setEditorVisible(false);
+  disableDirectPreviewEdit();
   setAiStatus("글 꾸미기 완료. 소제목, 단락, 사진 위치 표시를 보기 좋게 정리했어.");
 }
 
@@ -2527,21 +2546,200 @@ function setEditorVisible(visible) {
   if (!shell || !button) return;
   shell.classList.toggle("is-hidden", !visible);
   shell.classList.toggle("is-visible", visible);
-  button.textContent = visible ? "수정창 숨기기" : "직접 수정";
+  button.textContent = visible ? "수정창 숨기기" : "바로 수정";
   if (visible) $("postEditor").focus();
 }
 
+function isPreviewEditing() {
+  return $("postPreview")?.dataset.editing === "true";
+}
+
+function toggleDirectPreviewEdit() {
+  if (isPreviewEditing()) {
+    savePreviewEdits();
+  } else {
+    enableDirectPreviewEdit();
+  }
+}
+
+function enableDirectPreviewEdit() {
+  const preview = $("postPreview");
+  if (!preview) return;
+  setEditorVisible(false);
+  preview.contentEditable = "true";
+  preview.dataset.editing = "true";
+  preview.dataset.dirty = "false";
+  preview.classList.add("is-editing");
+
+  const editButton = $("toggleEditorBtn");
+  if (editButton) {
+    editButton.textContent = "수정 중";
+    editButton.classList.add("is-active");
+  }
+
+  const saveButton = $("savePreviewEditBtn");
+  if (saveButton) {
+    saveButton.disabled = false;
+    saveButton.textContent = "수정 저장";
+  }
+
+  preview.focus();
+  setAiStatus("본문을 바로 클릭해서 고친 뒤, 수정 저장을 눌러줘.");
+}
+
+function disableDirectPreviewEdit() {
+  const preview = $("postPreview");
+  if (!preview) return;
+  preview.contentEditable = "false";
+  preview.dataset.editing = "false";
+  preview.dataset.dirty = "false";
+  preview.classList.remove("is-editing");
+
+  const editButton = $("toggleEditorBtn");
+  if (editButton) {
+    editButton.textContent = "바로 수정";
+    editButton.classList.remove("is-active");
+  }
+
+  const saveButton = $("savePreviewEditBtn");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "수정 저장";
+  }
+}
+
+function markPreviewDirty() {
+  if (!isPreviewEditing()) return;
+  const preview = $("postPreview");
+  preview.dataset.dirty = "true";
+  const saveButton = $("savePreviewEditBtn");
+  if (saveButton) {
+    saveButton.disabled = false;
+    saveButton.textContent = "수정 저장 *";
+  }
+}
+
+function syncPreviewEditsIfNeeded(options = {}) {
+  if (isPreviewEditing()) savePreviewEdits(options);
+}
+
+function savePreviewEdits(options = {}) {
+  const preview = $("postPreview");
+  if (!preview) return;
+  const text = previewToPostText(preview);
+  $("postEditor").value = text.trim();
+  disableDirectPreviewEdit();
+  refreshReports();
+  if (!options.silent) setAiStatus("화면에서 직접 고친 내용을 원고에 저장했어.");
+}
+
+function previewToPostText(preview) {
+  const lines = [];
+  Array.from(preview.childNodes).forEach((node) => appendPreviewNodeText(node, lines));
+  return lines.join("\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function appendPreviewNodeText(node, lines) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = cleanPreviewText(node.textContent);
+    if (text) lines.push(text);
+    return;
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) return;
+  const element = node;
+  if (element.classList?.contains("photo-move-controls") || element.closest?.(".photo-move-controls")) return;
+
+  const tag = element.tagName;
+  if (tag === "FIGURE") {
+    appendFigureText(element, lines);
+    return;
+  }
+
+  if (tag === "H1" || tag === "H2" || tag === "H3") {
+    const text = cleanPreviewText(element.textContent);
+    if (text) {
+      pushBlank(lines);
+      lines.push(text);
+      pushBlank(lines);
+    }
+    return;
+  }
+
+  if (tag === "P") {
+    if (element.classList.contains("preview-tags")) {
+      const tags = Array.from(element.querySelectorAll("span")).map((span) => cleanPreviewText(span.textContent)).filter(Boolean);
+      if (tags.length) {
+        pushBlank(lines);
+        lines.push(tags.join(" "));
+      }
+      return;
+    }
+    const text = cleanPreviewText(element.textContent);
+    if (text) lines.push(text);
+    return;
+  }
+
+  if (tag === "UL" || tag === "OL") {
+    pushBlank(lines);
+    Array.from(element.children).forEach((item) => {
+      if (item.tagName !== "LI") return;
+      const text = cleanPreviewText(item.textContent).replace(/^[·-]\s*/, "");
+      if (text) lines.push(`· ${text}`);
+    });
+    pushBlank(lines);
+    return;
+  }
+
+  if (tag === "BR") {
+    pushBlank(lines);
+    return;
+  }
+
+  if (element.childNodes.length) {
+    Array.from(element.childNodes).forEach((child) => appendPreviewNodeText(child, lines));
+    return;
+  }
+
+  const text = cleanPreviewText(element.textContent);
+  if (text) lines.push(text);
+}
+
+function appendFigureText(figure, lines) {
+  const photoNumber = Number(figure.dataset.photoNumber || figure.querySelector("[data-photo-number]")?.dataset.photoNumber || 0);
+  const caption = cleanPreviewText(figure.querySelector("figcaption strong")?.textContent || figure.querySelector("img")?.alt || "");
+  const note = cleanPreviewText(figure.querySelector("figcaption span")?.textContent || "");
+
+  pushBlank(lines);
+  if (photoNumber) {
+    lines.push(`[사진 ${photoNumber}${caption ? `: ${caption}` : ""}]`);
+  } else if (caption) {
+    lines.push(caption);
+  }
+  if (note) lines.push(note);
+  pushBlank(lines);
+}
+
+function cleanPreviewText(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .replace(/위로\s*아래로/g, "")
+    .trim();
+}
+
 function insertSnippet(type) {
+  syncPreviewEditsIfNeeded({ silent: true });
   const editor = $("postEditor");
-  setEditorVisible(true);
   const snippets = {
     h2: "\n\n새 단락 제목\n",
     h3: "\n\n메뉴명\n이 메뉴는 내 기준으로...\n",
     photo: "\n\n[사진 1]\n",
     faq: "\n\nQ. 궁금한 점?\nA. 내 기준으로는...\n",
   };
-  insertAtCursor(editor, snippets[type] || "");
+  const snippet = snippets[type] || "";
+  editor.value = `${editor.value.trimEnd()}${snippet}`;
   refreshReports();
+  setAiStatus("필요한 블록을 원고 끝에 넣었어. 위치와 문장은 바로 수정에서 다듬으면 돼.");
 }
 
 function insertAtCursor(textarea, text) {
@@ -2804,11 +3002,17 @@ function copyText(text) {
 }
 
 async function copyStyledPost() {
+  syncPreviewEditsIfNeeded({ silent: true });
   refreshReports();
   const preview = $("postPreview");
+  const cleanPreview = preview.cloneNode(true);
+  cleanPreview.querySelectorAll(".photo-move-controls").forEach((element) => element.remove());
+  cleanPreview.querySelectorAll("[contenteditable]").forEach((element) => element.removeAttribute("contenteditable"));
+  cleanPreview.removeAttribute("contenteditable");
+  cleanPreview.classList.remove("is-editing");
   const html = `
     <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
-      ${preview.innerHTML}
+      ${cleanPreview.innerHTML}
     </article>
   `;
   const plain = $("postEditor").value;

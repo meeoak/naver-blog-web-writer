@@ -381,6 +381,17 @@ textarea {
   font-size: 12px;
 }
 
+.editor-toolbar button.is-active {
+  border-color: var(--sage);
+  background: #e7efe9;
+  color: var(--sage);
+}
+
+.editor-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
 .editor-shell {
   margin-top: 12px;
 }
@@ -443,6 +454,21 @@ textarea {
   line-height: 1.84;
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+
+.post-preview.is-editing {
+  outline: 3px solid rgba(47, 80, 60, 0.18);
+  outline-offset: 4px;
+  background: #fffefb;
+}
+
+.post-preview.is-editing :is(h1, h2, h3, p, li, figcaption) {
+  cursor: text;
+}
+
+.post-preview.is-editing :focus {
+  outline: 2px solid rgba(195, 164, 91, 0.32);
+  outline-offset: 2px;
 }
 
 .post-preview > * {
@@ -606,6 +632,7 @@ textarea {
   gap: 6px;
   max-width: 760px;
   margin: 0 auto 8px;
+  user-select: none;
 }
 
 .photo-move-controls button {
