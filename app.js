@@ -749,24 +749,17 @@ async function generateAIThumbnailImage() {
   const originalLabel = button.textContent;
   button.disabled = true;
   button.classList.add("is-busy");
-  button.textContent = "사진 생성 중";
-  setThumbnailAiStatus("참고 이미지처럼 따뜻한 식당 썸네일용 연출 사진을 만드는 중이야. 보통 20~60초 정도 걸릴 수 있어.");
+  button.textContent = "변환 중";
+  const referencePhoto = thumbnailReferencePhoto();
+  setThumbnailAiStatus(referencePhoto
+    ? `"${referencePhoto.caption || referencePhoto.name || "업로드 사진"}"을 기준으로 고퀄 반만화 썸네일 사진으로 변환하는 중이야. 보통 20~60초 정도 걸릴 수 있어.`
+    : "업로드 사진이 없어서 새 썸네일용 연출 사진을 만드는 중이야. 보통 20~60초 정도 걸릴 수 있어.");
 
   try {
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        prompt: buildThumbnailImagePrompt(getInput()),
-        size: "1536x1024",
-        quality: "medium",
-        n: 1,
-      }),
-    });
+    const input = getInput();
+    const response = referencePhoto
+      ? await requestThumbnailImageEdit(apiKey, model, input, referencePhoto)
+      : await requestThumbnailImageGeneration(apiKey, model, input);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = data?.error?.message || `AI 썸네일 사진 생성 실패 (${response.status})`;
@@ -777,9 +770,11 @@ async function generateAIThumbnailImage() {
     if (!dataUrl) throw new Error("생성된 이미지를 읽지 못했어.");
     state.aiThumbnailDataUrl = dataUrl;
     drawThumbnail();
-    setThumbnailAiStatus("AI 썸네일 사진 생성 완료. 참고 이미지처럼 연출 사진 배경을 깔고 글자를 다시 얹었어.");
+    setThumbnailAiStatus(referencePhoto
+      ? "AI 썸네일 변환 완료. 업로드 사진을 고퀄 반만화 느낌으로 바꾸고 글자를 다시 얹었어."
+      : "AI 썸네일 사진 생성 완료. 연출 사진 배경을 깔고 글자를 다시 얹었어.");
   } catch (error) {
-    setThumbnailAiStatus(`AI 썸네일 사진 생성 실패: ${friendlyOpenAIError(error.message)}`, true);
+    setThumbnailAiStatus(`AI 썸네일 변환 실패: ${friendlyOpenAIError(error.message)}`, true);
   } finally {
     button.disabled = false;
     button.classList.remove("is-busy");
@@ -793,17 +788,89 @@ function clearAIThumbnailImage() {
   setThumbnailAiStatus("AI 사진을 지우고 업로드 사진 조합 방식으로 돌아갔어.");
 }
 
-function buildThumbnailImagePrompt(input) {
+async function requestThumbnailImageGeneration(apiKey, model, input) {
+  return fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt: buildThumbnailImagePrompt(input, false),
+      size: "1536x1024",
+      quality: "high",
+      n: 1,
+    }),
+  });
+}
+
+async function requestThumbnailImageEdit(apiKey, model, input, photo) {
+  const formData = new FormData();
+  formData.append("model", model);
+  formData.append("prompt", buildThumbnailImagePrompt(input, true));
+  formData.append("size", "1536x1024");
+  formData.append("quality", "high");
+  formData.append("n", "1");
+  const referenceBlob = await makeThumbnailReferenceBlob(photo.dataUrl);
+  formData.append("image", referenceBlob, "thumbnail-reference.png");
+
+  return fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: formData,
+  });
+}
+
+function thumbnailReferencePhoto() {
+  const candidates = state.photos.filter((photo) => photo.dataUrl && photo.role !== "exclude");
+  if (!candidates.length) return null;
+  return candidates.find((photo) => photo.role === "thumbnail")
+    || candidates.find((photo) => ["food", "drink", "interior", "exterior"].includes(photo.role))
+    || candidates[0];
+}
+
+async function makeThumbnailReferenceBlob(dataUrl) {
+  const img = await loadCanvasImage(dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1536;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("기준 사진을 변환하지 못했어.");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = "#20140c";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  coverImageIn(ctx, img, 0, 0, canvas.width, canvas.height);
+  return canvasToBlob(canvas, "image/png", 0.95);
+}
+
+function canvasToBlob(canvas, type = "image/png", quality = 0.95) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("이미지 파일을 만들지 못했어."));
+    }, type, quality);
+  });
+}
+
+function buildThumbnailImagePrompt(input, hasReference = false) {
   const menus = input.menus.map((menu) => `${menu.name}${menu.local ? ` (${menu.local})` : ""}`).join(", ") || "Indonesian food";
   const extraStyle = $("thumbnailPromptInput").value.trim();
+  const referenceRule = hasReference
+    ? "Use the provided image as the main reference. Preserve the useful composition, food placement, table angle, and restaurant mood, but upgrade it into a cleaner high-quality thumbnail background."
+    : "Create a new high-quality thumbnail background from the description.";
   return `
-Create one photorealistic 16:9 blog thumbnail background image.
+${referenceRule}
 Subject: ${input.place || input.topic || "Indonesian restaurant"} in Jakarta/Kokas style.
 Food on table: ${menus}.
-Mood: warm Indonesian restaurant interior, cozy lighting, wooden table, teal or green tiles, soft background blur, appetizing grilled prawns and satay skewers in the foreground, rice basket, sambal sauce, jahe madu tea.
-Composition: leave the left 42 percent darker and cleaner for large title text. Put the most appetizing food in the lower center and right side. Keep the restaurant atmosphere visible in the back.
-Style note from user: ${extraStyle || "warm restaurant food thumbnail, polished but natural"}
-Important: do not put any letters, words, logo, watermark, sign text, people faces, hands, menu text, or brand marks in the image. The app will add all title text later.
+Style: premium Korean blog / YouTube thumbnail background, semi-illustrated but still food-photography based, crisp details, glossy appetizing food, warmer colors, slightly cartoon-like outlines, cinematic restaurant lighting, polished and high-resolution.
+Mood: warm Indonesian restaurant interior, cozy lighting, wooden table, teal or green tiles if suitable, soft background blur, appetizing grilled prawns and satay skewers, rice basket, sambal sauce, jahe madu tea.
+Composition: leave the left 42 percent darker and cleaner for large title text. Keep food in the lower center and right side. Keep the restaurant atmosphere visible in the back. Avoid making the whole image too dark.
+Style note from user: ${extraStyle || "high-quality semi-cartoon restaurant thumbnail, polished but natural"}
+Important: remove or ignore any existing letters, Korean/English/Indonesian words, red check marks, icons, UI buttons, watermark, logo, sign text, people faces, hands, menu text, or browser screenshot artifacts from the reference image. The app will add all title text later.
 `.trim();
 }
 
@@ -3196,6 +3263,8 @@ function coverImage(ctx, img, width, height) {
 }
 
 function coverImageIn(ctx, img, x, y, width, height) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   const ratio = Math.max(width / img.width, height / img.height);
   const drawWidth = img.width * ratio;
   const drawHeight = img.height * ratio;
