@@ -255,13 +255,273 @@ function menuNames(input) {
   return input.menus.map((menu) => menu.name).filter(Boolean).slice(0, 3);
 }
 
+function firstExperience(input, patterns) {
+  return input.experience.find((item) => patterns.some((pattern) => pattern.test(item))) || "";
+}
+
+function hasExperience(input, patterns) {
+  return Boolean(firstExperience(input, patterns));
+}
+
+function softSentence(text) {
+  let clean = cleanSentence(text);
+  clean = clean
+    .replace(/했습니다$/g, "했어")
+    .replace(/했다$/g, "했어")
+    .replace(/했다는?$/g, "했어")
+    .replace(/좋았다$/g, "좋았어")
+    .replace(/괜찮았다$/g, "괜찮았어")
+    .replace(/맞았다$/g, "맞았어")
+    .replace(/있음$/g, "있어")
+    .replace(/좋음$/g, "좋아")
+    .replace(/무난함$/g, "무난해")
+    .replace(/기억에 남음$/g, "기억에 남았어")
+    .replace(/편함$/g, "편해")
+    .replace(/먹음$/g, "먹었어");
+  if (!/[.!?。]$/.test(clean)) clean += ".";
+  return clean;
+}
+
+function makeOpeningSection(input) {
+  const place = input.place || input.topic;
+  const short = shortPlace(place);
+  const linesOut = [];
+  if (input.date || input.situation) {
+    linesOut.push(`${input.date || "이날"}, ${input.situation ? softSentence(input.situation) : `${short}에 다녀왔어.`}`);
+  }
+
+  if (/퇴근|저녁|점심|주말|대기/.test(`${input.situation} ${input.experience.join(" ")}`)) {
+    linesOut.push("사실 여기는 식사 시간대에는 대기가 생길 수 있어서, 가고 싶다고 바로 들어가기 쉬운 곳은 아니야.");
+    linesOut.push("그런데 이날은 운 좋게 자리가 있어서 오래 기다리지 않고 앉을 수 있었어.");
+  }
+
+  if (input.voice) linesOut.push(input.voice);
+
+  const favorite = firstExperience(input, [/좋아하는|자주|다시|또|갈 때마다|기억/]);
+  if (favorite) {
+    linesOut.push(`여긴 내 기준으로 ${softSentence(favorite).replace(/^여긴\s*/, "")}`);
+  } else {
+    linesOut.push(`여긴 나한테 관광지 맛집이라기보다, ${short}에서 밥 먹을 곳을 찾을 때 자연스럽게 떠오르는 식당에 가까워.`);
+  }
+
+  if (hasExperience(input, [/한국인|입맛|무난|처음/])) {
+    linesOut.push("한국인 입맛 기준으로도 꽤 무난한 편이고, 인도네시아 음식 특유의 소스 맛은 충분히 느낄 수 있어서 처음 오는 사람을 데려가기에도 괜찮아.");
+  }
+
+  const casa = firstExperience(input, [/Casa|Residence|가까/]);
+  if (casa) {
+    linesOut.push(`${place}는 코타카사블랑카 안에 있는 지점이고, ${softSentence(casa).replace(/^여긴\s*/, "")}`);
+  } else {
+    linesOut.push(`${place}는 코타카사블랑카 안에 있는 지점이야. 현지에서는 Kota Kasablanka를 Kokas(코카스)라고도 많이 불러서, Pesta Kebun Kokas를 찾는 사람도 같은 지점으로 보면 돼.`);
+  }
+
+  return ["방문한 날의 기록", ...linesOut];
+}
+
+function makePlaceSection(input) {
+  const place = input.place || input.topic;
+  const short = shortPlace(place);
+  return [
+    `${short}는 이런 곳이야`,
+    `${short}는 코타카사블랑카 안에서 인도네시아 음식을 편하게 먹기 좋은 식당이야. 분위기는 따뜻하고, 메뉴도 한국인 입맛에 너무 어렵지 않은 편이라 처음 오는 사람을 데려가기에도 괜찮아.`,
+    "· 몰 안에 있어서 퇴근길이나 약속 전후로 들르기 편해",
+    "· 음식이 전반적으로 무난해서 실패 확률이 낮아",
+    "· 분위기가 따뜻해서 다시 가도 기분 좋은 곳이야",
+    "코타카사블랑카 안에서 만난 Pesta Kebun은 입구부터 눈에 잘 들어오는 편이야. 밖에서 봐도 내부 분위기가 따뜻해 보여서 그냥 지나치기 어렵더라.",
+    "나는 이런 식당이 좋아. 엄청 특별한 날을 위해 마음먹고 가는 곳이라기보다, 평범한 날 밥 한 끼를 기분 좋게 만들어주는 쪽에 가까워서 더 자주 생각나는 곳.",
+  ];
+}
+
+function makeAtmosphereSection(input) {
+  const photoPlan = makePhotoPlan(input);
+  const interiorPhotos = photoPlan.filter((photo) => ["thumbnail", "exterior", "interior", "body"].includes(photo.role)).slice(0, 8);
+  const linesOut = [
+    "분위기가 먼저 예쁜 곳",
+    `${shortPlace(input.place || input.topic)}는 음식도 맛있지만, 나는 여기 분위기가 참 좋아.`,
+    "몰 안에 있는 식당인데도 안으로 들어가면 느낌이 확 달라져. 조명도 따뜻하고, 나무톤 인테리어와 꽃 장식, 빈티지한 소품들이 섞여 있어서 그냥 앉아만 있어도 기분이 좋아져.",
+    "뭔가 인도네시아 감성인데, 과하게 로컬스럽거나 촌스럽지 않고 예쁘게 잘 풀어낸 느낌이야. 사진 찍기도 좋고, 친구 데려오기도 괜찮은 곳.",
+    "특히 노란 조명이 전체적으로 따뜻하게 깔려 있어서 음식도 더 맛있어 보이고, 사진도 꽤 잘 나와.",
+    "인테리어는 곳곳에 꽃, 그림, 패브릭, 빈티지한 소품이 섞여 있는데 전체적으로 과하지 않게 잘 어울려. 현지 식당 분위기를 느끼고 싶은 사람한테도 괜찮고, 사진 남기고 싶은 사람한테도 괜찮은 곳.",
+    "손님이 꽤 있어도 공간이 너무 차갑게 느껴지지 않는 점도 좋았어. 자리에 앉아서 메뉴 기다리는 시간까지 괜히 기분 좋아지는 분위기랄까.",
+  ];
+
+  if (interiorPhotos.length) {
+    linesOut.push("");
+    interiorPhotos.forEach((photo) => {
+      linesOut.push(`[사진 ${photo.index}: ${photo.caption}]`);
+      linesOut.push(photo.note || `${photo.caption}도 글 중간에 넣으면 분위기 설명이 훨씬 자연스러워져.`);
+    });
+  } else {
+    [
+      "입구와 간판",
+      "따뜻한 조명과 나무톤 인테리어",
+      "바 쪽 분위기",
+      "벽면 소품과 꽃 장식",
+      "테이블에 음식이 놓인 순간",
+    ].forEach((caption, index) => {
+      linesOut.push(`[사진 자리 ${index + 1}: ${caption}]`);
+      linesOut.push(`${caption} 사진을 넣으면 글이 훨씬 실제 방문 후기처럼 살아나. 특히 분위기 사진은 메뉴 사진 사이에 넣으면 읽는 흐름이 덜 딱딱해져.`);
+    });
+  }
+
+  linesOut.push("몰 안 식당이라 접근성이 좋은 것도 장점이야. 비 오는 날이나 너무 더운 날에도 이동이 편하고, 쇼핑하거나 볼일 본 뒤에 바로 식사하기 좋아.");
+  return linesOut;
+}
+
+function menuIntro(input) {
+  if (!input.menus.length) return [];
+  const menuList = input.menus.map((menu) => `${menu.name}${menu.local ? `(${menu.local})` : ""}`).join(", ");
+  return [
+    "방문해서 먹은 메뉴",
+    `이날은 ${menuList}를 먹었어.`,
+    "메뉴가 막 특별한 건 아닌데, 내가 좋아하는 조합으로 골랐고 결과적으로 밥이랑 같이 먹기 좋은 흐름이었어.",
+    menuGlossary(input.menus),
+    "나는 이날 소스가 있는 메뉴 위주로 주문했는데, 결과적으로 밥이랑 먹기 좋은 조합이었어. 사테는 고소한 땅콩소스, 우당 바카르는 단짠 양념, 자헤 마두는 마지막에 입을 정리해주는 따뜻한 음료라서 흐름이 괜찮았어.",
+    "처음 방문하는 사람이라면 메뉴를 너무 많이 고민하기보다, 사테처럼 익숙한 메뉴 하나와 해산물이나 닭고기 메뉴 하나를 같이 시키면 무난할 것 같아. 인도네시아 음식이 처음이면 삼발은 조금씩 곁들여보는 게 좋아.",
+  ].filter(Boolean);
+}
+
+function menuGlossary(menus) {
+  const text = menus.map((menu) => `${menu.name} ${menu.local}`).join(" ").toLowerCase();
+  const terms = [];
+  if (/sate|사테/.test(text)) terms.push("Sate는 꼬치요리");
+  if (/udang|우당/.test(text)) terms.push("Udang은 새우");
+  if (/bakar|바카르/.test(text)) terms.push("Bakar는 굽다");
+  if (/jahe|자헤/.test(text)) terms.push("Jahe는 생강");
+  if (/madu|마두/.test(text)) terms.push("Madu는 꿀");
+  if (/nasi|밥/.test(text)) terms.push("Nasi는 밥");
+  if (!terms.length) return "";
+  return `인니어 메뉴 이름이 낯설 수 있는데, ${terms.join(", ")}라는 뜻이야. 단어 뜻을 조금 알면 메뉴판 보는 게 훨씬 쉬워져.`;
+}
+
+function makeMenuReview(menu, input) {
+  const label = `${menu.name}${menu.local ? `(${menu.local})` : ""}`;
+  const note = menu.note ? softSentence(menu.note) : `${menu.name}는 내 기준으로 무난하게 먹기 좋았어.`;
+  const key = `${menu.name} ${menu.local}`.toLowerCase();
+  const linesOut = [label];
+
+  if (/sate|사테/.test(key)) {
+    linesOut.push("먼저 사테. 사테는 한국 사람도 부담 없이 먹기 좋은 인도네시아 음식인 것 같아.");
+    linesOut.push("꼬치구이라 익숙한데, 땅콩소스가 올라가면 확실히 인도네시아 맛이 나.");
+    linesOut.push(note);
+    linesOut.push("한 입 먹으면 고소한 소스 맛이 먼저 오고, 뒤에 살짝 구운 향이 올라와. 라임을 조금 짜서 먹으면 더 깔끔해지고.");
+    linesOut.push("이건 흰밥이랑 같이 먹어야 더 맛있어. 소스가 진한 편이라 밥 위에 살짝 올려 먹어도 맛이 잘 살아나거든.");
+    linesOut.push("한국에서 꼬치구이를 좋아하는 사람이라면 사테도 크게 낯설지 않을 것 같아. 다만 우리가 흔히 먹는 소금구이나 데리야끼 꼬치와는 다르게, 땅콩소스가 들어가면서 더 부드럽고 묵직한 맛이 나는 게 차이점이야.");
+    linesOut.push("사테는 인도네시아에서 정말 흔하게 볼 수 있는 메뉴인데, 식당마다 소스 농도나 단맛, 고기 굽기 정도가 조금씩 달라. Pesta Kebun 사테는 내 기준으로 고소한 맛이 먼저 느껴지는 편이었어.");
+    linesOut.push("다만 소스가 진한 편이라 계속 먹으면 살짝 무겁게 느껴질 수도 있어. 그럴 때 라임을 조금 곁들이면 훨씬 깔끔해지고, 다른 메뉴랑 번갈아 먹기도 좋아.");
+    linesOut.push("[사진 자리: 사테]");
+    linesOut.push("소스가 듬뿍 올라간 사테 사진은 메뉴 설명 바로 아래에 넣으면 좋아. 보기만 해도 진한 맛이 느껴져서 글의 설득력이 확 살아나.");
+    return linesOut;
+  }
+
+  if (/udang|우당|새우/.test(key)) {
+    linesOut.push("이날 제일 기억에 남았던 건 우당 바카르였어.");
+    linesOut.push("우당은 새우, 바카르는 굽는다는 뜻이야. 그러니까 쉽게 말하면 구운 새우.");
+    linesOut.push(note);
+    linesOut.push("새우가 큼직하고 양념이 잘 발라져 있으면, 그냥 먹어도 맛있고 밥이랑 먹으면 더 좋아.");
+    linesOut.push("삼발을 많이 찍기보다는 조금만 곁들이는 게 내 입맛에는 더 잘 맞았어. 새우 양념 자체가 맛있으면 그 맛을 그대로 느끼는 쪽이 더 좋더라.");
+    linesOut.push("사테랑 우당 바카르를 같이 놓고 먹으면 밥 한 그릇은 금방이야.");
+    linesOut.push("우당 바카르는 이름만 보면 낯설 수 있지만 결국 구운 새우라서 한국 사람에게도 꽤 익숙한 메뉴야. 양념이 너무 세지만 않으면 실패 확률이 낮은 편이라 처음 방문하는 사람에게도 추천하기 좋아.");
+    linesOut.push("겉은 살짝 그을린 느낌이 있고 안쪽은 탱글한 상태면 제일 맛있어. 여기에 튀긴 샬롯이 올라가면 식감이 더 살아나서 한입 먹을 때 더 만족스럽더라.");
+    linesOut.push("[사진 자리: 우당 바카르]");
+    linesOut.push("우당 바카르는 메인 사진으로 쓰기 좋아. 새우, 라임, 삼발이 한 번에 보이면 이 식당에서 뭘 먹었는지가 바로 전달돼.");
+    return linesOut;
+  }
+
+  if (/jahe|자헤|madu|마두|생강|꿀/.test(key)) {
+    linesOut.push("음료는 자헤 마두로 골랐어.");
+    linesOut.push("자헤는 생강, 마두는 꿀이야. 쉽게 말하면 진한 생강꿀차 같은 따뜻한 음료.");
+    linesOut.push(note);
+    linesOut.push("처음 마시면 생강 맛이 살짝 알싸하게 올라오고, 뒤에 꿀 단맛이 부드럽게 남아.");
+    linesOut.push("자카르타는 날씨가 더워서 보통 차가운 음료를 많이 마시게 되는데, 가끔은 이렇게 따뜻한 음료가 더 잘 맞는 날이 있어. 양념 진한 음식을 먹을 때는 마무리로 꽤 괜찮았어.");
+    linesOut.push("한국에도 생강차가 있어서 그런지, 나는 이 음료가 낯설면서도 익숙했어. 생강 향이 확 올라오긴 하지만 꿀이 들어가서 끝맛은 부드러운 편이야.");
+    linesOut.push("생강 향에 약한 사람이라도 음식이랑 같이 천천히 마시면 크게 부담스럽지는 않을 것 같아. 오히려 기름지거나 양념 진한 메뉴를 먹은 뒤에는 속이 조금 편해지는 느낌도 있었어.");
+    linesOut.push("[사진 자리: 자헤 마두]");
+    linesOut.push("따뜻한 음료 사진은 글 후반부에 넣으면 좋아. 음식 후기에서 음료로 넘어가는 흐름이 자연스러워져.");
+    return linesOut;
+  }
+
+  linesOut.push(note);
+  linesOut.push("이 메뉴는 처음 보는 이름이어도 막 어렵게 느껴지는 쪽은 아니었어. 향이 부담스럽지 않고, 밥이나 다른 메뉴와 같이 먹기 괜찮은 편이야.");
+  linesOut.push("다음에 같은 곳을 다시 간다면 이 메뉴를 기준으로 다른 메뉴를 하나 더 붙여서 시켜볼 것 같아.");
+  return linesOut;
+}
+
+function makeTipsSection(input) {
+  const place = input.place || input.topic;
+  return [
+    "예약과 방문 팁",
+    "여기는 가능하면 피크 시간대에는 미리 확인하고 가는 게 좋을 것 같아.",
+    `${shortPlace(place)} 지점은 몰 안에 있어서 손님이 꽤 있는 편이야.`,
+    "점심시간이나 주말, 저녁 피크 시간에는 그냥 가면 대기할 가능성이 있어.",
+    "친구랑 가거나 가족이랑 갈 거면 미리 예약하거나 자리 확인을 해두는 게 마음 편할 듯해.",
+    "특히 코타카사블랑카는 퇴근 시간 이후나 주말에 사람이 몰리는 편이라, 인기 있는 식당은 자리 기다림이 생길 수 있어.",
+    "나처럼 기다리는 걸 힘들어하는 사람이라면 애매한 시간대를 노리는 것도 방법이야. 식사 피크를 살짝 피하면 같은 식당도 훨씬 편하게 느껴지더라.",
+    "그리고 몰 안에 있는 식당이라 이동 동선은 편하지만, 주차장이나 그랩 픽업 위치는 시간대에 따라 복잡할 수 있어. 약속이 있다면 이동 시간을 조금 여유 있게 잡는 게 좋아.",
+  ];
+}
+
+function makeFaqSection(input) {
+  const place = input.place || input.topic;
+  return [
+    "방문 전 자주 묻는 질문",
+    "검색해서 이 글을 보는 사람이라면 아마 이런 부분이 제일 궁금할 것 같아서, 내가 느낀 기준으로 짧게 정리해볼게.",
+    "Q. 예약은 해야 할까?",
+    "A. 평일 애매한 시간에는 바로 앉을 수도 있지만, 저녁 피크 시간이나 주말에는 예약하거나 미리 자리 확인하는 게 좋아 보여.",
+    "Q. 한국인 입맛에 맞을까?",
+    "A. 나는 꽤 무난하다고 느꼈어. 향신료가 아예 없는 건 아니지만, 사테나 우당 바카르처럼 구운 메뉴와 소스 메뉴는 한국 사람도 부담 없이 먹기 좋은 편이야.",
+    "Q. 많이 매울까?",
+    "A. 기본 메뉴 자체가 엄청 매운 느낌은 아니었어. 다만 삼발을 많이 곁들이면 매콤해질 수 있으니까, 매운 걸 잘 못 먹는다면 조금씩 찍어 먹는 걸 추천해. 외국인이면 직원이 매운 정도를 물어볼 때도 있어서, 맵지 않게 또는 조금만 맵게 조절해달라고 말하면 더 편해.",
+    "Q. 사진 찍기 좋은 곳일까?",
+    "A. 응, 조명과 인테리어가 예뻐서 사진 찍기 좋아. 음식 사진도 잘 나오고, 내부 소품이나 벽 장식도 찍을 만한 포인트가 많아.",
+    "Q. 혼자 가도 괜찮을까?",
+    "A. 혼자 식사도 가능해 보였지만, 분위기는 친구나 가족이랑 같이 와서 여러 메뉴를 나눠 먹는 쪽이 더 잘 맞는 것 같아. 그래도 퇴근길에 혼자 들러서 간단히 먹기에도 부담스럽지는 않았어.",
+    "Q. 주차나 이동은 편할까?",
+    `A. ${shortPlace(place)}가 몰 안에 있어서 그랩이나 택시로 이동하기는 편했어. 차를 가져간다면 몰 주차 기준을 확인하면 되고, 약속 장소로 잡기에도 무난한 위치였어.`,
+    "Q. 어떤 메뉴부터 시키면 좋을까?",
+    "A. 처음이라면 사테처럼 익숙한 메뉴 하나, 우당 바카르처럼 밥이랑 먹기 좋은 메인 하나, 그리고 자헤 마두나 다른 음료 하나를 같이 시키면 흐름이 좋아. 너무 낯선 메뉴만 고르는 것보다 익숙한 메뉴와 현지 느낌 나는 메뉴를 섞는 쪽이 실패 확률이 낮아.",
+  ];
+}
+
+function makeLocationSection(input) {
+  const place = input.place || input.topic;
+  const query = encodeURIComponent(place);
+  return [
+    "위치와 이동 팁",
+    `Google Maps 검색 링크:\nhttps://www.google.com/maps/search/?api=1&query=${query}`,
+    `${shortPlace(place)}는 몰 안에 있어서 택시나 그랩으로 이동하기도 편하고, 몰 안에서 약속 잡은 날 식사 장소로 넣기에도 괜찮아.`,
+    "자카르타는 이동 시간이 길어질 때가 많아서, 몰 안에서 식사까지 해결할 수 있는 곳은 확실히 편하더라.",
+  ];
+}
+
+function makeConclusionSection(input) {
+  const place = input.place || input.topic;
+  const topMenu = input.menus.find((menu) => /우당|udang|기억|제일|만족/i.test(`${menu.name} ${menu.local} ${menu.note}`)) || input.menus[0];
+  const menuLine = input.menus.length
+    ? `이날 먹은 메뉴 중에서는 ${topMenu.name}가 제일 기억에 남았고, ${menuNames(input).filter((name) => name !== topMenu.name).join(", ") || "다른 메뉴들"}도 무난하게 좋았어.`
+    : "이날 먹은 메뉴들은 전체적으로 무난하게 좋았어.";
+  return [
+    "결론은,, 다시 갈 만한 곳",
+    `역시 ${shortPlace(place)}는 맛있어.`,
+    menuLine,
+    "여긴 나한테 관광지 맛집이라기보다는, 인도네시아에서 지내면서 “맛있는 거 먹고 싶다” 싶을 때 생각나는 식당이야.",
+    "분위기도 예쁘고, 음식도 맛있고, 인도네시아 음식의 매력을 편하게 느낄 수 있는 곳.",
+    "자카르타 코타카사블랑카 맛집을 찾는 사람이라면 한 번쯤 후보에 넣어도 좋을 것 같아. 특히 인도네시아 음식이 처음인 한국인 친구를 데려간다면, 너무 어렵지 않으면서도 현지 음식 느낌은 충분히 낼 수 있어서 괜찮은 선택이 될 듯.",
+    "나는 아마 다음에도 코타카사블랑카에서 뭘 먹을지 고민하다가 또 여기 생각날 것 같아. 이런 식당은 막 특별한 날보다, 평범한 퇴근길에 더 고마운 곳이니까.",
+  ];
+}
+
+function englishSeoLine(input) {
+  const place = input.place || input.topic;
+  const menuText = input.menus.map((menu) => menu.local || menu.name).filter(Boolean).slice(0, 4).join(", ");
+  return `${place} is an Indonesian restaurant in Kokas mall, Jakarta${menuText ? `, good for ${menuText}` : ""}.`;
+}
+
 function makeNaverPost(input, tags) {
   const title = state.titleCandidates[0]?.text || input.topic;
   const place = input.place || input.topic;
-  const photoPlan = makePhotoPlan(input);
   const checkPoints = makeCheckPoints(input);
   const menuText = menuSection(input);
-  const voice = input.voice ? `\n${input.voice}` : "";
   const tagLine = tags.join(" ");
 
   return [
@@ -270,33 +530,23 @@ function makeNaverPost(input, tags) {
     "다시 가도 좋았던 이유",
     ...checkPoints.map((item) => `· ${item}`),
     "",
-    "방문한 날의 기록",
-    [input.date, input.situation].filter(Boolean).join(", "),
-    voice.trim(),
+    ...makeOpeningSection(input),
     "",
-    `${shortPlace(place)}는 이런 곳이야`,
-    `${place}는 내 기준으로 편하게 들르기 좋은 곳이야. 너무 어렵게 느껴지는 현지 음식점이라기보다, 처음 가는 사람도 비교적 무난하게 먹기 좋은 쪽에 가까웠어.`,
+    ...makePlaceSection(input),
     "",
-    "사진으로 본 분위기",
-    ...photoPlan.slice(0, 6).flatMap((photo) => [`[사진 ${photo.index}: ${photo.caption}]`, photo.note].filter(Boolean)),
+    ...makeAtmosphereSection(input),
     "",
     menuText,
     "",
-    "예약과 방문 팁",
-    "점심시간이나 저녁 피크 시간에는 사람이 몰릴 수 있어서, 여럿이 간다면 미리 확인하고 가는 편이 마음 편할 것 같아.",
+    ...makeTipsSection(input),
     "",
-    "방문 전 자주 묻는 질문",
-    "Q. 한국인 입맛에 맞을까?",
-    "A. 내 기준으로는 꽤 무난했어. 향신료가 아예 없는 건 아니지만, 구운 메뉴나 소스가 있는 메뉴는 부담 없이 먹기 좋았어.",
+    ...makeFaqSection(input),
     "",
-    "Q. 많이 매울까?",
-    "A. 기본 메뉴 자체가 엄청 매운 느낌은 아니었어. 삼발을 많이 곁들이면 매콤해질 수 있으니까, 매운 걸 잘 못 먹는다면 조금씩 찍어 먹는 게 좋아.",
+    ...makeLocationSection(input),
     "",
-    "Q. 다시 갈 만한 곳일까?",
-    "A. 응, 나는 다시 갈 것 같아. 특별한 날보다 평범한 날 밥 먹으러 가기 좋은 곳에 가까웠어.",
+    ...makeConclusionSection(input),
     "",
-    "결론은,, 다시 갈 만한 곳",
-    `${place}는 내 기준으로 다시 갈 만한 곳이야. 엄청 화려하게 특별하다기보다, 실패 확률이 낮고 편하게 먹기 좋은 곳이라는 점이 마음에 들었어.`,
+    englishSeoLine(input),
     "",
     tagLine,
   ].filter((line) => line !== undefined).join("\n");
@@ -332,10 +582,14 @@ function makeBlogspotPost(input, tags) {
 
 function makeCheckPoints(input) {
   const items = [];
-  input.experience.forEach((item) => items.push(cleanSentence(item)));
+  const place = input.place || input.topic;
+  items.push(`${shortPlace(place)}에서 들르기 편한 위치`);
+  if (hasExperience(input, [/맛있|무난|입맛|좋아/])) items.push("갈 때마다 무난하게 맛있는 인도네시아 음식");
+  input.experience.slice(0, 3).forEach((item) => items.push(softSentence(item).replace(/[.。]$/g, "")));
   if (input.menus.length) items.push(`이번에 먹은 ${menuNames(input).join(", ")}`);
-  if (input.keywordsKo.some((item) => item.includes("주재원"))) items.push("주재원이나 자카르타 생활 중 들르기 좋은 위치");
-  return unique(items).slice(0, 6);
+  if (hasExperience(input, [/대기|예약|피크|주말/]) || /대기|예약|피크|주말/.test(input.situation)) items.push("대기가 생길 수 있는 시간대와 예약 팁");
+  items.push("다시 가도 좋은 따뜻한 분위기");
+  return unique(items).slice(0, 7);
 }
 
 function cleanSentence(text) {
@@ -344,13 +598,11 @@ function cleanSentence(text) {
 
 function menuSection(input) {
   if (!input.menus.length) return "";
-  const intro = `이날은 ${input.menus.map((menu) => `${menu.name}${menu.local ? `(${menu.local})` : ""}`).join(", ")}를 먹었어.`;
   const sections = input.menus.flatMap((menu) => [
     "",
-    `${menu.name}${menu.local ? `(${menu.local})` : ""}`,
-    menu.note || `${menu.name}는 내 기준으로 꽤 무난하게 먹기 좋았어.`,
+    ...makeMenuReview(menu, input),
   ]);
-  return ["방문해서 먹은 메뉴", "", intro, ...sections].join("\n");
+  return [...menuIntro(input), ...sections].join("\n");
 }
 
 function makeTags(input) {
@@ -442,8 +694,8 @@ function renderCounts(text) {
   const withoutSpaces = text.replace(/\s/g, "").length;
   const withSpaces = text.length;
   const paragraphs = lines(text).length;
-  const status = withoutSpaces >= 2500 ? "좋음" : withoutSpaces >= 1500 ? "보통" : "짧음";
-  const cls = withoutSpaces >= 2500 ? "status-good" : withoutSpaces >= 1500 ? "status-warn" : "status-bad";
+  const status = withoutSpaces >= 4500 ? "최종 원고급" : withoutSpaces >= 2500 ? "보강 필요" : "짧음";
+  const cls = withoutSpaces >= 4500 ? "status-good" : withoutSpaces >= 2500 ? "status-warn" : "status-bad";
   $("countReport").innerHTML = `
     <div class="metric-row">공백 포함: <strong>${withSpaces.toLocaleString()}</strong>자</div>
     <div class="metric-row">공백 제외: <strong>${withoutSpaces.toLocaleString()}</strong>자</div>
@@ -504,9 +756,13 @@ function renderAiReport(text) {
 }
 
 function renderChecklist(text, tags) {
+  const withoutSpaces = text.replace(/\s/g, "").length;
   const checks = [
     ["제목에 장소명 포함", text.split(/\r?\n/)[0]?.includes(getInput().place.split(" ")[0] || "")],
     ["첫 문단에 방문 상황 포함", Boolean(getInput().situation && text.includes(getInput().situation.slice(0, 8)))],
+    ["최종 문서급 글자수", withoutSpaces >= 4500],
+    ["메뉴별 긴 후기 포함", (text.match(/\(.+?\)/g) || []).length >= 3 && text.includes("방문해서 먹은 메뉴")],
+    ["예약/위치/FAQ 포함", text.includes("예약과 방문 팁") && text.includes("위치와 이동 팁") && text.includes("방문 전 자주 묻는 질문")],
     ["사진 위치 표시 있음", text.includes("[사진") || state.photos.length === 0],
     ["태그 18개 이하", tags.length <= 18],
     ["FAQ 포함", text.includes("Q.") && text.includes("A.")],
@@ -856,4 +1112,3 @@ function debounce(fn, delay) {
     timer = setTimeout(() => fn(...args), delay);
   };
 }
-
