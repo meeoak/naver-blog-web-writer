@@ -161,7 +161,7 @@ function handlePhotos(event) {
       renderPhotos();
       drawThumbnail();
       refreshReports();
-      updatePhotoStatus(`${loaded}장 추가됨. 필요하면 사진 설명과 역할을 바꿔줘.`);
+      updatePhotoStatus(`${loaded}장 추가됨. 사진 설명/역할을 확인한 뒤 글 생성을 누르면 원고에 반영돼.`);
     };
     reader.onerror = () => {
       loaded += 1;
@@ -358,9 +358,23 @@ function makePlaceSection(input) {
   ];
 }
 
+function makePhotoReflectionSection(input) {
+  const plan = makePhotoPlan(input);
+  if (!plan.length) return [];
+  const linesOut = [
+    "본문에 넣을 사진",
+    "아래 사진들은 원고에 넣을 위치를 먼저 잡아둔 거야. 블로그에 올릴 때 이 순서대로 사진을 끼워 넣으면 흐름이 자연스러워.",
+  ];
+  plan.forEach((photo) => {
+    linesOut.push(`[사진 ${photo.index}: ${photo.caption}]`);
+    linesOut.push(photo.note || photoPlacementNote(photo, input));
+  });
+  return linesOut;
+}
+
 function makeAtmosphereSection(input) {
   const photoPlan = makePhotoPlan(input);
-  const interiorPhotos = photoPlan.filter((photo) => ["thumbnail", "exterior", "interior", "body"].includes(photo.role)).slice(0, 8);
+  const interiorPhotos = photoPlan.filter((photo) => ["thumbnail", "exterior", "interior", "body"].includes(photo.role)).slice(0, 12);
   const linesOut = [
     "분위기가 먼저 예쁜 곳",
     `${shortPlace(input.place || input.topic)}는 음식도 맛있지만, 나는 여기 분위기가 참 좋아.`,
@@ -425,6 +439,7 @@ function makeMenuReview(menu, input) {
   const note = menu.note ? softSentence(menu.note) : `${menu.name}는 내 기준으로 무난하게 먹기 좋았어.`;
   const key = `${menu.name} ${menu.local}`.toLowerCase();
   const linesOut = [label];
+  const menuPhotos = photoLinesForMenu(menu, input);
 
   if (/sate|사테/.test(key)) {
     linesOut.push("먼저 사테. 사테는 한국 사람도 부담 없이 먹기 좋은 인도네시아 음식인 것 같아.");
@@ -435,8 +450,12 @@ function makeMenuReview(menu, input) {
     linesOut.push("한국에서 꼬치구이를 좋아하는 사람이라면 사테도 크게 낯설지 않을 것 같아. 다만 우리가 흔히 먹는 소금구이나 데리야끼 꼬치와는 다르게, 땅콩소스가 들어가면서 더 부드럽고 묵직한 맛이 나는 게 차이점이야.");
     linesOut.push("사테는 인도네시아에서 정말 흔하게 볼 수 있는 메뉴인데, 식당마다 소스 농도나 단맛, 고기 굽기 정도가 조금씩 달라. Pesta Kebun 사테는 내 기준으로 고소한 맛이 먼저 느껴지는 편이었어.");
     linesOut.push("다만 소스가 진한 편이라 계속 먹으면 살짝 무겁게 느껴질 수도 있어. 그럴 때 라임을 조금 곁들이면 훨씬 깔끔해지고, 다른 메뉴랑 번갈아 먹기도 좋아.");
-    linesOut.push("[사진 자리: 사테]");
-    linesOut.push("소스가 듬뿍 올라간 사테 사진은 메뉴 설명 바로 아래에 넣으면 좋아. 보기만 해도 진한 맛이 느껴져서 글의 설득력이 확 살아나.");
+    if (menuPhotos.length) {
+      linesOut.push(...menuPhotos);
+    } else {
+      linesOut.push("[사진 자리: 사테]");
+      linesOut.push("소스가 듬뿍 올라간 사테 사진은 메뉴 설명 바로 아래에 넣으면 좋아. 보기만 해도 진한 맛이 느껴져서 글의 설득력이 확 살아나.");
+    }
     return linesOut;
   }
 
@@ -449,8 +468,12 @@ function makeMenuReview(menu, input) {
     linesOut.push("사테랑 우당 바카르를 같이 놓고 먹으면 밥 한 그릇은 금방이야.");
     linesOut.push("우당 바카르는 이름만 보면 낯설 수 있지만 결국 구운 새우라서 한국 사람에게도 꽤 익숙한 메뉴야. 양념이 너무 세지만 않으면 실패 확률이 낮은 편이라 처음 방문하는 사람에게도 추천하기 좋아.");
     linesOut.push("겉은 살짝 그을린 느낌이 있고 안쪽은 탱글한 상태면 제일 맛있어. 여기에 튀긴 샬롯이 올라가면 식감이 더 살아나서 한입 먹을 때 더 만족스럽더라.");
-    linesOut.push("[사진 자리: 우당 바카르]");
-    linesOut.push("우당 바카르는 메인 사진으로 쓰기 좋아. 새우, 라임, 삼발이 한 번에 보이면 이 식당에서 뭘 먹었는지가 바로 전달돼.");
+    if (menuPhotos.length) {
+      linesOut.push(...menuPhotos);
+    } else {
+      linesOut.push("[사진 자리: 우당 바카르]");
+      linesOut.push("우당 바카르는 메인 사진으로 쓰기 좋아. 새우, 라임, 삼발이 한 번에 보이면 이 식당에서 뭘 먹었는지가 바로 전달돼.");
+    }
     return linesOut;
   }
 
@@ -462,8 +485,12 @@ function makeMenuReview(menu, input) {
     linesOut.push("자카르타는 날씨가 더워서 보통 차가운 음료를 많이 마시게 되는데, 가끔은 이렇게 따뜻한 음료가 더 잘 맞는 날이 있어. 양념 진한 음식을 먹을 때는 마무리로 꽤 괜찮았어.");
     linesOut.push("한국에도 생강차가 있어서 그런지, 나는 이 음료가 낯설면서도 익숙했어. 생강 향이 확 올라오긴 하지만 꿀이 들어가서 끝맛은 부드러운 편이야.");
     linesOut.push("생강 향에 약한 사람이라도 음식이랑 같이 천천히 마시면 크게 부담스럽지는 않을 것 같아. 오히려 기름지거나 양념 진한 메뉴를 먹은 뒤에는 속이 조금 편해지는 느낌도 있었어.");
-    linesOut.push("[사진 자리: 자헤 마두]");
-    linesOut.push("따뜻한 음료 사진은 글 후반부에 넣으면 좋아. 음식 후기에서 음료로 넘어가는 흐름이 자연스러워져.");
+    if (menuPhotos.length) {
+      linesOut.push(...menuPhotos);
+    } else {
+      linesOut.push("[사진 자리: 자헤 마두]");
+      linesOut.push("따뜻한 음료 사진은 글 후반부에 넣으면 좋아. 음식 후기에서 음료로 넘어가는 흐름이 자연스러워져.");
+    }
     return linesOut;
   }
 
@@ -471,6 +498,47 @@ function makeMenuReview(menu, input) {
   linesOut.push("이 메뉴는 처음 보는 이름이어도 막 어렵게 느껴지는 쪽은 아니었어. 향이 부담스럽지 않고, 밥이나 다른 메뉴와 같이 먹기 괜찮은 편이야.");
   linesOut.push("다음에 같은 곳을 다시 간다면 이 메뉴를 기준으로 다른 메뉴를 하나 더 붙여서 시켜볼 것 같아.");
   return linesOut;
+}
+
+function photoLinesForMenu(menu, input) {
+  const matches = makePhotoPlan(input)
+    .filter((photo) => ["food", "drink", "menu"].includes(photo.role) || photoMatchesMenu(photo, menu))
+    .filter((photo) => photoMatchesMenu(photo, menu))
+    .slice(0, 3);
+
+  return matches.flatMap((photo) => [
+    `[사진 ${photo.index}: ${photo.caption}]`,
+    photo.note || `${photo.caption} 사진은 ${menu.name} 설명 바로 아래에 넣으면 좋아.`,
+  ]);
+}
+
+function photoMatchesMenu(photo, menu) {
+  const haystack = `${photo.caption} ${photo.note} ${photo.name}`.toLowerCase();
+  const targets = [
+    menu.name,
+    menu.local,
+    ...(menu.local || "").split(/\s+/),
+    ...(menu.name || "").split(/\s+/),
+  ].filter(Boolean).map((item) => item.toLowerCase());
+  if (targets.some((target) => target.length > 1 && haystack.includes(target))) return true;
+  if (/sate|사테/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /sate|사테|꼬치/.test(haystack);
+  if (/udang|우당|새우/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /udang|우당|새우|shrimp/.test(haystack);
+  if (/jahe|자헤|madu|마두|생강|꿀/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack);
+  return false;
+}
+
+function photoRoleLabel(role) {
+  const labels = {
+    thumbnail: "썸네일",
+    exterior: "외관/입구",
+    interior: "분위기",
+    menu: "메뉴판",
+    food: "음식",
+    drink: "음료",
+    map: "지도/위치",
+    body: "기타",
+  };
+  return labels[role] || "기타";
 }
 
 function makeTipsSection(input) {
@@ -556,6 +624,8 @@ function makeNaverPost(input, tags) {
     "다시 가도 좋았던 이유",
     ...checkPoints.map((item) => `· ${item}`),
     "",
+    ...makePhotoReflectionSection(input),
+    ...(state.photos.length ? [""] : []),
     ...makeOpeningSection(input),
     "",
     ...makePlaceSection(input),
@@ -902,6 +972,7 @@ function makePhotoPlan(input) {
     index: index + 1,
     caption: photo.caption || `사진 ${index + 1}`,
     role: photo.role,
+    name: photo.name || "",
     note: photo.note || photoPlacementNote(photo, input),
     alt: `${input.place || input.topic} ${photo.caption || photo.role}`,
   }));
@@ -911,8 +982,10 @@ function photoPlacementNote(photo) {
   if (photo.role === "thumbnail") return "첫 화면과 썸네일에 쓰기 좋은 사진.";
   if (photo.role === "interior") return "분위기 설명 파트에 넣기 좋은 사진.";
   if (photo.role === "food") return "메뉴 후기 파트에 넣기 좋은 사진.";
+  if (photo.role === "drink") return "음료 후기 파트에 넣기 좋은 사진.";
+  if (photo.role === "menu") return "메뉴 설명 앞에 넣기 좋은 사진.";
   if (photo.role === "map") return "위치와 이동 팁 파트에 넣기 좋은 사진.";
-  return "본문 흐름에 맞춰 넣기 좋은 사진.";
+  return `역할이 ${photoRoleLabel(photo.role)}로 되어 있어. 더 정확히 반영하려면 역할을 음식, 음료, 분위기 중 하나로 바꿔줘.`;
 }
 
 function renderTitleCandidates() {
