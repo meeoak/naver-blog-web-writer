@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260613-photo-size-controls">
+  <link rel="stylesheet" href="styles.css?v=20260613-photo-bulk-density">
 </head>
 <body>
   <main class="app-shell">
@@ -86,6 +86,26 @@ Casa Residence에서 가까워서 들르기 편함
           <span>사진 파일</span>
           <input id="photoInput" type="file" accept="image/*,.heic,.heif" multiple>
         </label>
+        <div class="field-grid photo-bulk-controls">
+          <label>
+            <span>사진 사용량</span>
+            <select id="photoDensityInput">
+              <option value="many" selected>많이 넣기</option>
+              <option value="balanced">적당히 넣기</option>
+              <option value="all">거의 전부 넣기</option>
+            </select>
+          </label>
+          <label>
+            <span>전체 사진 크기</span>
+            <select id="bulkPhotoSizeInput">
+              <option value="auto" selected>자동 크기</option>
+              <option value="small">작게</option>
+              <option value="medium">보통</option>
+              <option value="large">크게</option>
+              <option value="full">가득</option>
+            </select>
+          </label>
+        </div>
         <p id="photoStatus" class="metric-row">아직 추가된 사진이 없어요.</p>
         <div id="photoList" class="photo-list"></div>
       </section>
@@ -194,6 +214,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260613-photo-size-controls"></script>
+  <script src="app.js?v=20260613-photo-bulk-density"></script>
 </body>
 </html>

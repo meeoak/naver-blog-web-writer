@@ -63,6 +63,8 @@ function bindEvents() {
   $("dietTagsBtn").addEventListener("click", dietTagsFromEditor);
   $("photoInput").addEventListener("change", handlePhotos);
   $("autoMatchPhotosBtn").addEventListener("click", autoMatchPhotosFromButton);
+  $("photoDensityInput").addEventListener("change", generateAll);
+  $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
   $("saveVoiceBtn").addEventListener("click", saveVoicePreset);
   $("resetBtn").addEventListener("click", resetInputs);
   $("renderThumbBtn").addEventListener("click", drawThumbnail);
@@ -114,6 +116,7 @@ function getInput() {
     thumbRibbon: $("thumbRibbonInput").value.trim(),
     brand: $("brandInput").value.trim() || "Ara in Indonesia",
     voice: $("voiceInput").value.trim(),
+    photoDensity: $("photoDensityInput").value || "many",
   };
 }
 
@@ -195,6 +198,27 @@ function makeId() {
 function updatePhotoStatus(message) {
   const status = $("photoStatus");
   if (status) status.textContent = message;
+}
+
+function applyBulkPhotoSize() {
+  const size = $("bulkPhotoSizeInput").value || "auto";
+  state.photos.forEach((photo) => {
+    photo.size = size;
+  });
+  renderPhotos();
+  refreshReports();
+  updatePhotoStatus(`${state.photos.length}장 사진 크기를 ${photoSizeLabel(size)}로 맞췄어.`);
+}
+
+function photoSizeLabel(size) {
+  const labels = {
+    auto: "자동 크기",
+    small: "작게",
+    medium: "보통",
+    large: "크게",
+    full: "가득",
+  };
+  return labels[size] || "자동 크기";
 }
 
 function autoCaption(filename, index) {
@@ -580,7 +604,8 @@ function makePhotoReflectionSection(input) {
 
 function makeAtmosphereSection(input) {
   const { selected } = selectedPhotoPlan(input);
-  const interiorPhotos = selected.filter((photo) => ["thumbnail", "exterior", "interior", "body"].includes(photo.role)).slice(0, 3);
+  const settings = photoPlanSettings(input);
+  const interiorPhotos = selected.filter((photo) => ["thumbnail", "exterior", "interior", "body"].includes(photo.role)).slice(0, settings.atmosphere);
   const linesOut = [
     "분위기가 먼저 예쁜 곳",
     `${shortPlace(input.place || input.topic)}는 음식도 맛있지만, 나는 여기 분위기가 참 좋아.`,
@@ -688,10 +713,11 @@ function makeMenuReview(menu, input) {
 
 function photoLinesForMenu(menu, input) {
   const { selected } = selectedPhotoPlan(input);
+  const settings = photoPlanSettings(input);
   const matches = selected
     .filter((photo) => ["food", "drink", "menu"].includes(photo.role) || photoMatchesMenu(photo, menu))
     .filter((photo) => photoMatchesMenu(photo, menu))
-    .slice(0, 1);
+    .slice(0, settings.menuPlacement);
 
   return matches.flatMap((photo) => [
     `[사진 ${photo.index}: ${photo.caption}]`,
@@ -1157,6 +1183,7 @@ function makePhotoPlan(input) {
     index: index + 1,
     caption: photo.caption || `사진 ${index + 1}`,
     role: photo.role,
+    size: photo.size || "auto",
     name: photo.name || "",
     note: photo.note || photoPlacementNote(photo, input),
     alt: `${input.place || input.topic} ${photo.caption || photo.role}`,
@@ -1167,52 +1194,75 @@ function selectedPhotoPlan(input) {
   const plan = makePhotoPlan(input);
   const selected = [];
   const skipped = [];
-  const used = new Set();
+  const settings = photoPlanSettings(input);
   const counts = {
+    total: 0,
     atmosphere: 0,
     menuBoard: 0,
     drink: 0,
     food: new Map(),
+    captions: new Map(),
   };
 
   plan.forEach((photo) => {
     const menu = matchedMenuForPhoto(photo, input);
-    const group = photoGroupKey(photo, menu);
-    const limit = photoGroupLimit(photo, menu, counts);
+    const decision = photoSelectionDecision(photo, menu, counts, settings);
 
-    if (used.has(group) || limit <= 0) {
-      skipped.push({ ...photo, skipped: true, skipReason: used.has(group) ? "비슷한 사진이라 제외" : "대표 사진 수를 줄이기 위해 제외" });
+    if (!decision.use) {
+      skipped.push({ ...photo, skipped: true, skipReason: decision.reason });
       return;
     }
 
-    used.add(group);
     selected.push({ ...photo, matchedMenu: menu, skipped: false });
-    registerSelectedPhoto(photo, menu, counts);
+    registerSelectedPhoto(photo, menu, counts, settings);
   });
 
   return { selected, skipped };
 }
 
-function photoGroupKey(photo, menu) {
-  if (menu) return `menu:${menu.name}:${photo.role}`;
-  if (["thumbnail", "exterior", "interior", "body"].includes(photo.role)) return `atmosphere:${photo.caption}`;
-  if (photo.role === "menu") return "menu-board";
-  if (photo.role === "drink") return `drink:${photo.caption}`;
-  return `${photo.role}:${photo.caption}`;
+function photoPlanSettings(input) {
+  const density = input.photoDensity || "many";
+  if (density === "balanced") {
+    return { maxTotal: 10, atmosphere: 4, menuBoard: 1, drink: 2, perMenu: 2, sameCaption: 2, menuPlacement: 2 };
+  }
+  if (density === "all") {
+    return { maxTotal: Math.max(state.photos.length, 1), atmosphere: 12, menuBoard: 4, drink: 12, perMenu: 99, sameCaption: 99, menuPlacement: 99 };
+  }
+  return { maxTotal: 20, atmosphere: 7, menuBoard: 2, drink: 5, perMenu: 6, sameCaption: 6, menuPlacement: 6 };
 }
 
-function photoGroupLimit(photo, menu, counts) {
+function photoSelectionDecision(photo, menu, counts, settings) {
+  if (counts.total >= settings.maxTotal) return { use: false, reason: "사진 사용량 설정에 맞춰 제외" };
+
+  const captionKey = normalizePreviewLine(photo.caption || photo.name || "");
+  const sameCaptionCount = counts.captions.get(captionKey) || 0;
+  if (captionKey && sameCaptionCount >= settings.sameCaption) {
+    return { use: false, reason: "비슷한 설명의 사진이 많아서 일부 제외" };
+  }
+
   if (menu && ["food", "drink", "menu"].includes(photo.role)) {
     const key = menu.name;
-    return (counts.food.get(key) || 0) < 1 ? 1 : 0;
+    return (counts.food.get(key) || 0) < settings.perMenu
+      ? { use: true }
+      : { use: false, reason: `${menu.name} 사진이 충분해서 일부 제외` };
   }
-  if (photo.role === "drink") return counts.drink < 1 ? 1 : 0;
-  if (photo.role === "menu") return counts.menuBoard < 1 ? 1 : 0;
-  if (["thumbnail", "exterior", "interior", "body"].includes(photo.role)) return counts.atmosphere < 3 ? 1 : 0;
-  return 1;
+  if (photo.role === "drink") {
+    return counts.drink < settings.drink ? { use: true } : { use: false, reason: "음료 사진 수를 줄이기 위해 제외" };
+  }
+  if (photo.role === "menu") {
+    return counts.menuBoard < settings.menuBoard ? { use: true } : { use: false, reason: "메뉴판 사진 수를 줄이기 위해 제외" };
+  }
+  if (["thumbnail", "exterior", "interior", "body"].includes(photo.role)) {
+    return counts.atmosphere < settings.atmosphere ? { use: true } : { use: false, reason: "분위기 사진 수를 줄이기 위해 제외" };
+  }
+  return { use: true };
 }
 
 function registerSelectedPhoto(photo, menu, counts) {
+  counts.total += 1;
+  const captionKey = normalizePreviewLine(photo.caption || photo.name || "");
+  if (captionKey) counts.captions.set(captionKey, (counts.captions.get(captionKey) || 0) + 1);
+
   if (menu && ["food", "drink", "menu"].includes(photo.role)) {
     counts.food.set(menu.name, (counts.food.get(menu.name) || 0) + 1);
   } else if (photo.role === "drink") {

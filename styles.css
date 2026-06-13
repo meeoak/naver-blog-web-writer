@@ -155,6 +155,10 @@ textarea {
   margin: 10px 0;
 }
 
+.photo-bulk-controls {
+  margin-bottom: 8px;
+}
+
 .photo-picker input[type="file"] {
   cursor: pointer;
   border-style: dashed;
