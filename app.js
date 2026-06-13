@@ -250,7 +250,6 @@ function autoMatchPhotos(input, force = false) {
   if (!state.photos.length) return;
   const atmosphereLabels = ["입구와 전체 분위기", "따뜻한 내부 분위기", "테이블 분위기", "바 쪽 분위기", "소품과 조명"];
   let atmosphereIndex = 0;
-  let foodIndex = 0;
 
   state.photos.forEach((photo, index) => {
     if (photo.userEdited && !force) return;
@@ -270,14 +269,13 @@ function autoMatchPhotos(input, force = false) {
       caption = "메뉴판";
       note = photoNarrativeNote(role, caption, null, input);
     } else if (role === "drink") {
-      const menu = matchedMenuForPhoto(photo, input) || input.menus.find((item) => /jahe|madu|자헤|마두|음료|drink/i.test(`${item.name} ${item.local}`)) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
+      const menu = matchedMenuForPhoto(photo, input) || matchedMenuByVisualKey("drink", input);
       caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음료";
       note = photoNarrativeNote(role, caption, menu, input);
     } else if (role === "food") {
-      const menu = matchedMenuForPhoto(photo, input) || input.menus[foodIndex % Math.max(input.menus.length, 1)];
-      caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : "음식 사진";
+      const menu = matchedMenuForPhoto(photo, input);
+      caption = menu ? `${menu.name}${menu.local ? `(${menu.local})` : ""}` : foodCaptionFromPhoto(photo);
       note = photoNarrativeNote(role, caption, menu, input);
-      foodIndex += 1;
     } else {
       caption = isGenericPhotoCaption(photo.caption) ? `사진 ${index + 1}` : photo.caption;
       note = photoNarrativeNote(role, caption, null, input);
@@ -300,6 +298,8 @@ function inferPhotoRole(photo, index, total, input) {
   if (/sate|satay|udang|bakar|shrimp|food|dish|plate|사테|우당|새우|음식|요리|밥/.test(text)) return "food";
   if (/entrance|exterior|outside|입구|외관|간판/.test(text)) return "exterior";
   if (/interior|inside|table|seat|bar|내부|분위기|자리|조명|소품/.test(text)) return index === 0 ? "thumbnail" : "interior";
+  if (photo.analysis?.visualMenu === "drink") return "drink";
+  if (["sate", "udang", "food"].includes(photo.analysis?.visualMenu)) return "food";
   if (photo.analysis?.visualRole) {
     if (photo.analysis.visualRole === "food") return "food";
     return index === 0 ? "thumbnail" : photo.analysis.visualRole;
@@ -313,6 +313,15 @@ function inferPhotoRole(photo, index, total, input) {
 
 function matchedMenuForPhoto(photo, input) {
   return input.menus.find((menu) => photoMatchesMenu(photo, menu));
+}
+
+function matchedMenuByVisualKey(key, input) {
+  return input.menus.find((menu) => menuMatchesVisualKey(menu, key));
+}
+
+function foodCaptionFromPhoto(photo) {
+  if (photo.analysis?.visualMenu === "mixed") return "같이 주문한 메뉴들";
+  return "음식 사진";
 }
 
 function isGenericPhotoCaption(caption) {
@@ -362,6 +371,9 @@ function summarizePhotoPixels(data, size) {
   let center = 0;
   let brightCenter = 0;
   let warmOrGreenCenter = 0;
+  let orangeCenter = 0;
+  let brownCenter = 0;
+  let drinkToneCenter = 0;
   let darkAll = 0;
   let saturationAll = 0;
   let saturationCenter = 0;
@@ -385,21 +397,60 @@ function summarizePhotoPixels(data, size) {
         saturationCenter += saturation;
         if (brightness > 135) brightCenter += 1;
         if ((r > 120 && g > 70 && b < 120) || (g > r * 0.9 && g > b * 1.08)) warmOrGreenCenter += 1;
+        if (r > 145 && g > 70 && g < 145 && b < 95 && r > g * 1.12) orangeCenter += 1;
+        if (r > 85 && r < 170 && g > 55 && g < 135 && b < 95 && r >= g && saturation > 0.22) brownCenter += 1;
+        if (r > 120 && g > 95 && b > 60 && r > b * 1.35 && Math.abs(r - g) < 70 && saturation < 0.42) drinkToneCenter += 1;
       }
     }
   }
 
   const centerBrightRatio = brightCenter / Math.max(center, 1);
   const centerFoodColorRatio = warmOrGreenCenter / Math.max(center, 1);
+  const centerOrangeRatio = orangeCenter / Math.max(center, 1);
+  const centerBrownRatio = brownCenter / Math.max(center, 1);
+  const centerDrinkToneRatio = drinkToneCenter / Math.max(center, 1);
   const avgSaturation = saturationAll / Math.max(total, 1);
   const centerSaturation = saturationCenter / Math.max(center, 1);
   const darkRatio = darkAll / Math.max(total, 1);
   let visualRole = "interior";
+  let visualMenu = "";
+  let visualMenuConfidence = 0;
   if ((centerBrightRatio > 0.18 && centerSaturation > 0.28) || centerFoodColorRatio > 0.24 || (avgSaturation > 0.36 && darkRatio < 0.6)) {
     visualRole = "food";
   }
   if (darkRatio > 0.62 && centerFoodColorRatio < 0.16) visualRole = "interior";
-  return { centerBrightRatio, centerFoodColorRatio, avgSaturation, darkRatio, visualRole };
+
+  if (visualRole === "food") {
+    if (centerOrangeRatio > 0.08 && centerOrangeRatio > centerBrownRatio * 0.85) {
+      visualMenu = "udang";
+      visualMenuConfidence = Math.min(0.88, 0.55 + centerOrangeRatio * 2);
+    } else if (centerBrownRatio > 0.16 || (centerFoodColorRatio > 0.32 && centerOrangeRatio < 0.08)) {
+      visualMenu = "sate";
+      visualMenuConfidence = Math.min(0.82, 0.5 + centerBrownRatio * 1.6);
+    } else {
+      visualMenu = "mixed";
+      visualMenuConfidence = 0.45;
+    }
+  }
+
+  if (centerDrinkToneRatio > 0.3 && centerOrangeRatio < 0.05 && avgSaturation < 0.32 && darkRatio < 0.35) {
+    visualRole = "drink";
+    visualMenu = "drink";
+    visualMenuConfidence = 0.68;
+  }
+
+  return {
+    centerBrightRatio,
+    centerFoodColorRatio,
+    centerOrangeRatio,
+    centerBrownRatio,
+    centerDrinkToneRatio,
+    avgSaturation,
+    darkRatio,
+    visualRole,
+    visualMenu,
+    visualMenuConfidence,
+  };
 }
 
 function renderPhotos() {
@@ -638,6 +689,7 @@ function menuIntro(input) {
     menuGlossary(input.menus),
     "나는 이날 소스가 있는 메뉴 위주로 주문했는데, 결과적으로 밥이랑 먹기 좋은 조합이었어. 사테는 고소한 땅콩소스, 우당 바카르는 단짠 양념, 자헤 마두는 마지막에 입을 정리해주는 따뜻한 음료라서 흐름이 괜찮았어.",
     "처음 방문하는 사람이라면 메뉴를 너무 많이 고민하기보다, 사테처럼 익숙한 메뉴 하나와 해산물이나 닭고기 메뉴 하나를 같이 시키면 무난할 것 같아. 인도네시아 음식이 처음이면 삼발은 조금씩 곁들여보는 게 좋아.",
+    ...photoLinesForGeneralFood(input),
   ].filter(Boolean);
 }
 
@@ -725,8 +777,22 @@ function photoLinesForMenu(menu, input) {
   ]);
 }
 
+function photoLinesForGeneralFood(input) {
+  const { selected } = selectedPhotoPlan(input);
+  const settings = photoPlanSettings(input);
+  const matches = selected
+    .filter((photo) => ["food", "drink", "menu"].includes(photo.role))
+    .filter((photo) => !matchedMenuForPhoto(photo, input))
+    .slice(0, Math.min(4, settings.menuPlacement));
+
+  return matches.flatMap((photo) => [
+    `[사진 ${photo.index}: ${photo.caption}]`,
+    photo.note || photoNarrativeNote(photo.role, photo.caption, null, input),
+  ]);
+}
+
 function photoMatchesMenu(photo, menu) {
-  const haystack = `${photo.caption} ${photo.note} ${photo.name}`.toLowerCase();
+  const haystack = photoMenuEvidence(photo);
   const targets = [
     menu.name,
     menu.local,
@@ -734,9 +800,27 @@ function photoMatchesMenu(photo, menu) {
     ...(menu.name || "").split(/\s+/),
   ].filter(Boolean).map((item) => item.toLowerCase());
   if (targets.some((target) => target.length > 1 && haystack.includes(target))) return true;
-  if (/sate|사테/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /sate|사테|꼬치/.test(haystack);
-  if (/udang|우당|새우/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /udang|우당|새우|shrimp/.test(haystack);
-  if (/jahe|자헤|madu|마두|생강|꿀/.test(`${menu.name} ${menu.local}`.toLowerCase())) return /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack);
+  const menuText = `${menu.name} ${menu.local}`.toLowerCase();
+  if (/sate|사테/.test(menuText) && /sate|사테|꼬치/.test(haystack)) return true;
+  if (/udang|우당|새우/.test(menuText) && /udang|우당|새우|shrimp/.test(haystack)) return true;
+  if (/jahe|자헤|madu|마두|생강|꿀/.test(menuText) && /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(haystack)) return true;
+  if (photo.analysis?.visualMenuConfidence >= 0.6 && menuMatchesVisualKey(menu, photo.analysis.visualMenu)) return true;
+  return false;
+}
+
+function photoMenuEvidence(photo) {
+  const parts = [photo.name || ""];
+  if (photo.userEdited || !photo.autoMatched) {
+    parts.push(photo.caption || "", photo.note || "");
+  }
+  return parts.join(" ").toLowerCase();
+}
+
+function menuMatchesVisualKey(menu, key) {
+  const text = `${menu.name || ""} ${menu.local || ""}`.toLowerCase();
+  if (key === "sate") return /sate|satay|사테/.test(text);
+  if (key === "udang") return /udang|우당|새우|shrimp/.test(text);
+  if (key === "drink") return /jahe|자헤|madu|마두|생강|꿀|drink|음료/.test(text);
   return false;
 }
 
