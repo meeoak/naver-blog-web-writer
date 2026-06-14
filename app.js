@@ -3803,31 +3803,34 @@ async function copyStyledPost() {
 
 async function exportToGoogleDocs() {
   const button = $("exportGoogleDocsBtn");
-  const originalLabel = button?.textContent || "구글문서 복사+열기";
+  const originalLabel = button?.textContent || "구글문서+리포트";
   if (button) {
     button.disabled = true;
     button.classList.add("is-busy");
     button.textContent = "복사 중";
   }
-  const { html, plain, title } = buildPostExportHtml();
+  const { html, plain, title } = buildPostExportHtml({ includeReport: true });
   const docsUrl = `https://docs.google.com/document/create?title=${encodeURIComponent(title)}`;
   try {
-    setAiStatus(`구글문서용으로 사진 포함 원고를 먼저 복사하는 중이야. 문서 제목은 "${title}"로 열게.`);
+    setAiStatus(`구글문서용으로 사진 포함 원고와 리포트를 먼저 복사하는 중이야. 문서 제목은 "${title}"로 열게.`);
     const copiedRich = await copyRichHtml(html, plain);
     if (!copiedRich) {
       downloadGoogleDocsHtml(html, title);
-      setAiStatus(`브라우저가 사진 포함 복사를 지원하지 않아서 "${safeFilename(title)}.html" 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.`, true);
+      if (button) button.textContent = "복사 완료";
+      const docsWindow = window.open(docsUrl, "_blank", "noopener");
+      setAiStatus(`사진 포함 복사는 브라우저가 지원하지 않아서 "${safeFilename(title)}.html" 파일도 저장했어. 대신 원고와 리포트 일반 텍스트는 복사됐어. ${googleDocsOpenGuide(docsWindow)}`, true);
       return;
     }
     if (button) button.textContent = "복사 완료";
     const docsWindow = window.open(docsUrl, "_blank", "noopener");
-    const openGuide = docsWindow
-      ? "새로 열린 Google Docs 문서 제목은 블로그 제목으로 들어가고, 본문은 Ctrl+V로 붙여넣어줘."
-      : "팝업이 막혔으면 구글문서 복사+열기를 한 번 더 누르거나 Google Docs에서 새 문서를 열고 Ctrl+V를 눌러줘.";
-    setAiStatus(`구글문서용 복사 완료. ${openGuide} Google Docs에는 보안상 본문 자동 붙여넣기는 안 돼.`);
+    setAiStatus(`구글문서용 복사 완료. 원고 뒤에 작성 리포트까지 같이 들어가 있어. ${googleDocsOpenGuide(docsWindow)} Google Docs에는 보안상 본문 자동 붙여넣기는 안 돼.`);
   } catch (error) {
+    const plainCopied = await copyPlainTextFallback(plain);
     downloadGoogleDocsHtml(html, title);
-    setAiStatus(`브라우저가 사진 포함 복사를 막아서 "${safeFilename(title)}.html" 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.`, true);
+    const docsWindow = plainCopied ? window.open(docsUrl, "_blank", "noopener") : null;
+    setAiStatus(plainCopied
+      ? `사진 포함 복사는 막혔지만 원고와 리포트 일반 텍스트는 복사됐어. "${safeFilename(title)}.html" 파일도 같이 저장했어. ${googleDocsOpenGuide(docsWindow)}`
+      : `브라우저가 클립보드 복사를 막아서 원고와 리포트를 "${safeFilename(title)}.html" 파일로 저장했어. Google Drive에 올린 뒤 Docs로 열어봐.`, true);
   } finally {
     if (button) {
       button.disabled = false;
@@ -3839,7 +3842,13 @@ async function exportToGoogleDocs() {
   }
 }
 
-function buildPostExportHtml() {
+function googleDocsOpenGuide(docsWindow) {
+  return docsWindow
+    ? "새로 열린 Google Docs 문서 제목은 블로그 제목으로 들어가고, 본문은 Ctrl+V로 붙여넣어줘."
+    : "팝업이 막혔으면 구글문서+리포트를 한 번 더 누르거나 Google Docs에서 새 문서를 열고 Ctrl+V를 눌러줘.";
+}
+
+function buildPostExportHtml(options = {}) {
   syncPreviewEditsIfNeeded({ silent: true });
   refreshReports();
   const preview = $("postPreview");
@@ -3849,14 +3858,93 @@ function buildPostExportHtml() {
   cleanPreview.removeAttribute("contenteditable");
   cleanPreview.classList.remove("is-editing");
   applyInlinePostStyles(cleanPreview);
+  const reportExport = options.includeReport ? buildReportExportHtml() : { html: "", plain: "" };
   const html = `
     <article style="font-family: Arial, 'Malgun Gothic', sans-serif; color: #292f2b; font-size: 16.5px; line-height: 1.84;">
       ${cleanPreview.innerHTML}
     </article>
+    ${reportExport.html}
   `;
-  const plain = $("postEditor").value;
-  const title = postTitleForExport(plain);
+  const postPlain = $("postEditor").value;
+  const plain = [postPlain, reportExport.plain].filter(Boolean).join("\n\n");
+  const title = postTitleForExport(postPlain);
   return { html, plain, title };
+}
+
+function buildReportExportHtml() {
+  const tags = ($("tagEditor")?.value || state.tags.join(" ")).trim();
+  const blocks = [
+    ["글자수", $("countReport")?.innerHTML || ""],
+    ["예상 유입 키워드", $("keywordReport")?.innerHTML || ""],
+    ["예상 광고", $("adReport")?.innerHTML || ""],
+    ["태그", `<p>${escapeHtml(tags || "태그 없음")}</p>`],
+    ["AI 느낌 검사", $("aiReport")?.innerHTML || ""],
+    ["업로드 체크리스트", $("checklistReport")?.innerHTML || ""],
+    ["사진 배치", $("photoPlanReport")?.innerHTML || ""],
+    ["AI 검색 검수", $("aiSearchReport")?.innerHTML || ""],
+  ];
+  const blockHtml = blocks.map(([title, body]) => reportBlockExportHtml(title, body)).join("");
+  const html = `
+    <section style="margin:54px 0 0;padding:34px 0 0;border-top:2px solid #d8cfae;font-family:Arial, 'Malgun Gothic', sans-serif;color:#24332c;">
+      <h1 style="margin:0 0 10px;color:#173f36;font-size:26px;line-height:1.38;font-weight:800;letter-spacing:0;">작성 리포트</h1>
+      <p style="margin:0 0 24px;color:#667066;font-size:14.5px;line-height:1.75;">원고 검수용 리포트야. 네이버에 올릴 때는 위 원고를 사용하고, 아래 내용은 키워드·광고·태그·체크리스트 확인용으로 보면 돼.</p>
+      ${blockHtml}
+    </section>
+  `;
+  return {
+    html,
+    plain: htmlToPlainText(html),
+  };
+}
+
+function reportBlockExportHtml(title, bodyHtml) {
+  return `
+    <section style="margin:0 0 22px;padding:18px 18px 16px;border:1px solid #e5dfcf;border-radius:8px;background:#fffefb;">
+      <h2 style="margin:0 0 12px;color:#173f36;font-size:18px;line-height:1.4;font-weight:800;letter-spacing:0;">${escapeHtml(title)}</h2>
+      <div style="font-size:14.5px;line-height:1.72;color:#28342e;">
+        ${inlineReportContentStyles(bodyHtml)}
+      </div>
+    </section>
+  `;
+}
+
+function inlineReportContentStyles(html) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = String(html || "").trim() || "<p>내용 없음</p>";
+  wrapper.querySelectorAll("ul").forEach((element) => {
+    element.setAttribute("style", "margin:0;padding-left:20px;color:#28342e;font-size:14.5px;line-height:1.72;");
+  });
+  wrapper.querySelectorAll("li").forEach((element) => {
+    element.setAttribute("style", "margin:0 0 7px;line-height:1.72;");
+  });
+  wrapper.querySelectorAll("p, .metric-row, .check-row").forEach((element) => {
+    element.setAttribute("style", "margin:0 0 7px;color:#28342e;font-size:14.5px;line-height:1.72;");
+  });
+  wrapper.querySelectorAll("strong").forEach((element) => {
+    element.setAttribute("style", "color:#173f36;font-weight:800;");
+  });
+  wrapper.querySelectorAll(".status-good").forEach((element) => {
+    element.setAttribute("style", "color:#1d624d;font-weight:700;");
+  });
+  wrapper.querySelectorAll(".status-warn").forEach((element) => {
+    element.setAttribute("style", "color:#8a5b16;font-weight:700;");
+  });
+  wrapper.querySelectorAll(".status-bad").forEach((element) => {
+    element.setAttribute("style", "color:#9b2e2e;font-weight:700;");
+  });
+  wrapper.querySelectorAll(".source-list").forEach((element) => {
+    element.setAttribute("style", "margin-top:10px;color:#28342e;font-size:14px;line-height:1.7;");
+  });
+  wrapper.querySelectorAll("a").forEach((element) => {
+    element.setAttribute("style", "display:block;color:#1a5c87;text-decoration:underline;");
+  });
+  return wrapper.innerHTML;
+}
+
+function htmlToPlainText(html) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = String(html || "");
+  return (wrapper.innerText || wrapper.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 async function copyRichHtml(html, plain) {
@@ -3872,6 +3960,15 @@ async function copyRichHtml(html, plain) {
     }),
   ]);
   return true;
+}
+
+async function copyPlainTextFallback(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function postTitleForExport(text) {
