@@ -254,6 +254,31 @@ textarea {
   font-size: 13px;
 }
 
+#codexPromptOutput {
+  min-height: 210px;
+  background: #fffefb;
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.advanced-ai-settings {
+  padding: 10px 12px;
+  border: 1px dashed #d8d0c0;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.advanced-ai-settings summary {
+  cursor: pointer;
+  color: #6a5a3e;
+  font-weight: 700;
+}
+
+.advanced-ai-settings[open] {
+  display: grid;
+  gap: 10px;
+}
+
 .photo-list {
   display: grid;
   gap: 10px;

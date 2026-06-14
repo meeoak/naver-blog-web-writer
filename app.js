@@ -75,7 +75,8 @@ function bindEvents() {
   $("photoDensityInput").addEventListener("change", generateAll);
   $("photoCaptionModeInput").addEventListener("change", generateAll);
   $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
-  $("aiGenerateBtn").addEventListener("click", generateWithOpenAI);
+  $("aiGenerateBtn").addEventListener("click", buildCodexRequestFromButton);
+  $("copyCodexPromptBtn").addEventListener("click", copyCodexPrompt);
   $("clearOpenAIKeyBtn").addEventListener("click", clearOpenAIKey);
   ["openaiKeyInput", "aiModelInput", "aiInstructionInput"].forEach((id) => {
     $(id).addEventListener("input", saveOpenAISettings);
@@ -659,6 +660,85 @@ function generateAll() {
   renderTitleCandidates();
   drawThumbnail();
   refreshReports();
+}
+
+function buildCodexRequestFromButton() {
+  const input = getInput();
+  autoMatchPhotos(input, false);
+  renderPhotos();
+  const request = buildCodexWritingRequest(input);
+  $("codexPromptOutput").value = request;
+  setAiStatus("원고 스타일과 Codex 요청서를 정리했어. 복사 버튼을 누른 뒤 이 Codex 대화에 붙여넣으면 돼.");
+}
+
+async function copyCodexPrompt() {
+  const text = $("codexPromptOutput").value.trim() || buildCodexWritingRequest(getInput());
+  $("codexPromptOutput").value = text;
+  try {
+    await navigator.clipboard.writeText(text);
+    setAiStatus("Codex 요청서를 복사했어. 이 대화창에 붙여넣으면 내가 원고를 이어서 써줄 수 있어.");
+  } catch {
+    setAiStatus("브라우저가 복사를 막았어. Codex 요청서 칸의 내용을 직접 선택해서 복사해줘.", true);
+  }
+}
+
+function buildCodexWritingRequest(input) {
+  const experience = input.experience.map((item) => `- ${item}`).join("\n") || "- 아직 경험 메모 없음";
+  const menus = input.menus.map((menu) => `- ${menu.name}${menu.local ? `(${menu.local})` : ""}: ${menu.note || "메모 없음"}`).join("\n") || "- 아직 메뉴 메모 없음";
+  const voice = [input.voice, ...state.voicePresets].filter(Boolean).slice(0, 5).map((item) => `- ${item}`).join("\n") || "- 담백한 1인칭 후기체";
+  const photos = state.photos.length
+    ? state.photos.map((photo, index) => `- 사진 ${index + 1}: ${photo.caption || "설명 없음"} / ${photoSceneLabel(photo)} / ${photo.note || "추가 메모 없음"}`).join("\n")
+    : "- 아직 사진 없음. 사진이 있으면 실제 사진 내용과 맞는 설명만 사용";
+  const keywords = [...input.keywordsKo, ...input.keywordsGoogle].filter(Boolean).join(", ") || "검색어 미입력";
+  const tags = makeTags(input).slice(0, 18).join(" ");
+
+  return `
+아래 기준으로 네이버 블로그 원고를 작성해줘.
+
+[내가 원하는 원고 스타일]
+- 단순 정보글이 아니라, 내가 실제로 다녀온 경험형 후기처럼 써줘.
+- AI가 쓴 것처럼 매끈하기만 한 문장보다 내 상황과 감상이 자연스럽게 들어가야 해.
+- 1인칭으로 쓰고, "내 기준으로는", "나는", "이날은", "다시 간다면" 같은 표현을 자연스럽게 섞어줘.
+- 과장된 광고 문구, "추천드립니다", "만족스러운 경험", "도움이 되었으면 합니다" 같은 표현은 피해야 해.
+- 검색 유입은 잡되, 읽으면 사람이 직접 다녀온 글처럼 느껴져야 해.
+- 이미 방문한 곳이면 처음 가본 것처럼 쓰지 말고, 다시 방문한 뉘앙스가 있으면 반영해줘.
+- 정보만 나열하지 말고 방문 상황, 위치, 분위기, 먹은 메뉴, 대기/예약 팁, 한국인 입맛 기준, 재방문 여부를 자연스럽게 연결해줘.
+- 소제목은 7~10개 정도로 나누고, 소제목은 짧고 자연스러워야 해.
+- 문단은 모바일에서 읽기 쉽게 2~4문장 단위로 나눠줘.
+- 사진은 본문 흐름에 맞게 넣고, 사진 아래 설명은 실제 사진과 맞는 짧은 문장으로 써줘.
+- 확실하지 않은 메뉴명이나 사진 내용은 절대 단정하지 말고 "같이 주문한 메뉴", "테이블에 나온 음식"처럼 안전하게 표현해줘.
+- 마지막에는 결론과 FAQ, 태그를 포함해줘.
+
+[이번 글 정보]
+주제: ${input.topic || "미입력"}
+장소명: ${input.place || "미입력"}
+방문 날짜: ${input.date || "미입력"}
+그날 상황: ${input.situation || "미입력"}
+
+[내 말투 샘플]
+${voice}
+
+[경험 메모]
+${experience}
+
+[먹은 메뉴]
+${menus}
+
+[사진 메모]
+${photos}
+
+[SEO 검색어]
+${keywords}
+
+[태그 후보]
+${tags}
+
+[원고 작성 요청]
+- 네이버 블로그에 바로 붙여넣을 수 있는 최종 원고로 써줘.
+- 제목 후보 3개, 본문 원고, 사진 위치 제안, 사진 설명, FAQ, 태그를 포함해줘.
+- 글은 너무 짧지 않게, 경험이 충분히 보이도록 작성해줘.
+- 내 말투를 살리되 문장은 너무 지저분하지 않게 정리해줘.
+`.trim();
 }
 
 async function generateWithOpenAI() {
