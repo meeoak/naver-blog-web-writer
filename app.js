@@ -75,8 +75,8 @@ function bindEvents() {
   $("photoDensityInput").addEventListener("change", generateAll);
   $("photoCaptionModeInput").addEventListener("change", generateAll);
   $("bulkPhotoSizeInput").addEventListener("change", applyBulkPhotoSize);
-  $("aiGenerateBtn").addEventListener("click", buildCodexRequestFromButton);
-  $("copyCodexPromptBtn").addEventListener("click", copyCodexPrompt);
+  $("aiGenerateBtn").addEventListener("click", generateWithOpenAI);
+  if ($("copyCodexPromptBtn")) $("copyCodexPromptBtn").addEventListener("click", copyCodexPrompt);
   $("clearOpenAIKeyBtn").addEventListener("click", clearOpenAIKey);
   ["openaiKeyInput", "aiModelInput", "aiInstructionInput"].forEach((id) => {
     $(id).addEventListener("input", saveOpenAISettings);
@@ -1082,7 +1082,7 @@ function makeOpenAIRequestBody(model, input, aiPhotos) {
     content.push({
       type: "input_image",
       image_url: photo.imageUrl,
-      detail: "high",
+      detail: "low",
     });
   });
 
@@ -1133,7 +1133,9 @@ function makeOpenAIRequestBody(model, input, aiPhotos) {
 function makeOpenAIPrompt(input, aiPhotos) {
   const menus = input.menus.map((menu) => `- ${menu.name}${menu.local ? `(${menu.local})` : ""}: ${menu.note || "메모 없음"}`).join("\n") || "메뉴 메모 없음";
   const experience = input.experience.map((item) => `- ${item}`).join("\n") || "경험 메모 없음";
-  const keywords = [...input.keywordsKo, ...input.keywordsGoogle].join(", ");
+  const keywords = [...input.keywordsKo, ...input.keywordsGoogle].filter(Boolean).join(", ");
+  const searchKeywords = keywords || [input.place, input.topic].filter(Boolean).join(", ") || "현재 입력한 장소와 메뉴";
+  const menuExamples = input.menus.map((menu) => menu.local || menu.name).filter(Boolean).slice(0, 3).join(", ") || "사진 속 메뉴명";
   const photoNumbers = aiPhotos.map((photo) => `사진 ${photo.index}`).join(", ") || "사진 없음";
   const photoDensityLabel = input.photoDensity === "recommended" ? "추천컷만" : input.photoDensity === "many" ? "조금 더 많이" : "모두 넣기";
   const extraInstruction = $("aiInstructionInput").value.trim();
@@ -1148,7 +1150,7 @@ function makeOpenAIPrompt(input, aiPhotos) {
 - 구글문서로 사람이 함께 다듬은 최종 원고처럼 자연스럽고 긴 네이버 블로그 포스팅을 만든다.
 - 사용자가 네이버 블로그에 바로 붙여 넣을 수 있는 최종 업로드용 원고를 만든다.
 - 사진을 직접 보고 글 흐름에 맞는 위치에 넣는다.
-- 사진 속 메뉴명이 확실하지 않으면 사테, 우당 바카르, 자헤 마두처럼 단정하지 않는다.
+- 사진 속 메뉴명이 확실하지 않으면 ${menuExamples}처럼 단정하지 않는다.
 - 확실하지 않은 사진은 "테이블에 나온 음식", "같이 주문한 메뉴", "내부 분위기"처럼 안전하게 표현한다.
 - 사진 설명은 사진 바로 아래에 1문장으로 붙인다.
 - 제목은 검색어가 들어가되 너무 광고처럼 보이지 않게 쓴다.
@@ -1176,7 +1178,7 @@ ${experience}
 ${menus}
 
 [SEO 키워드]
-${keywords}
+${searchKeywords}
 
 [사용 가능한 사진 번호]
 ${photoNumbers}
@@ -1186,7 +1188,7 @@ ${photoDensityLabel}
 
 [원고 규칙]
 - naver_post는 제목부터 시작하는 완성 원고로 작성한다.
-- 한국어 중심으로 쓰고, 필요한 곳에 Pesta Kebun, Kokas, Kota Kasablanka 같은 검색어를 자연스럽게 넣는다.
+- 한국어 중심으로 쓰고, 필요한 곳에 ${searchKeywords} 같은 검색어를 자연스럽게 넣는다.
 - 글은 최소 4500자 이상을 목표로 한다.
 - 소제목은 너무 과장하지 말고 자연스럽게 쓴다.
 - 소제목은 한 줄에 하나씩 쓰고, 바로 다음 줄부터 본문을 쓴다. 소제목 없는 긴 문단 덩어리를 만들지 않는다.
@@ -2201,10 +2203,9 @@ function dietTags(tags, limit = 18) {
 
 function tagScore(tag) {
   let score = 1;
-  if (/맛집|Pesta|Kokas|Kota|Kasablanka/i.test(tag)) score += 4;
-  if (/사테|우당|자헤|Sate|Udang|Jahe/i.test(tag)) score += 3;
+  if (/맛집|식당|Restaurant|Food|카페|몰|Mall|Kokas|Kota|Kasablanka|Jakarta|자카르타/i.test(tag)) score += 4;
+  if (/쌀국수|pho|포24|pho24|사테|우당|자헤|Sate|Udang|Jahe|메뉴|음식/i.test(tag)) score += 3;
   if (/주재원|여행|인도네시아|자카르타/i.test(tag)) score += 2;
-  if (/Restaurant|Food|Mall/i.test(tag)) score += 1;
   return score;
 }
 
@@ -2867,8 +2868,7 @@ function renderStoredAiSearchReport() {
 function dietTagsFromEditor() {
   syncPreviewEditsIfNeeded({ silent: true });
   const input = getInput();
-  const current = parseCommaOrSpaceTags($("tagEditor").value);
-  const next = dietTags([...current, ...makeTags(input)], 18);
+  const next = dietTags(makeTags(input), 18);
   state.tags = next;
   $("tagEditor").value = next.join(" ");
   const text = $("postEditor").value.replace(/\n#[^\n#]+(?:\s+#[^\n#]+)*\s*$/m, "").trim();
