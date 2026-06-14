@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>네이버 블로그 작성기</title>
-  <link rel="stylesheet" href="styles.css?v=20260614-openai-restore">
+  <link rel="stylesheet" href="styles.css?v=20260614-clean-start">
 </head>
 <body>
   <main class="app-shell">
@@ -22,55 +22,48 @@
       <div class="field-grid">
         <label>
           <span>글 주제</span>
-          <input id="topicInput" type="text" value="Pesta Kebun Kota Kasablanka 후기">
+          <input id="topicInput" type="text" placeholder="예: Pho 24 Kokas 후기">
         </label>
         <label>
           <span>장소명</span>
-          <input id="placeInput" type="text" value="Pesta Kebun Kota Kasablanka">
+          <input id="placeInput" type="text" placeholder="예: Pho 24 Kota Kasablanka">
         </label>
         <label>
           <span>방문 날짜</span>
-          <input id="dateInput" type="text" value="2026년 6월 평일 저녁">
+          <input id="dateInput" type="text" placeholder="예: 2026년 6월 평일 저녁">
         </label>
         <label>
           <span>그날 상황</span>
-          <input id="situationInput" type="text" value="퇴근 후 밥 먹고 들어가려고 들렀고, 운 좋게 대기 없이 앉았다.">
+          <input id="situationInput" type="text" placeholder="예: 살짝 춥고 따뜻한 국물이 먹고 싶어서 들렀다">
         </label>
       </div>
 
       <label class="stacked">
         <span>경험 메모</span>
-        <textarea id="experienceInput" rows="8">Kokas 몰 안에서 좋아하는 식당 중 하나
-Casa Residence에서 가까워서 들르기 편함
-사테, 우당 바카르, 자헤 마두를 먹음
-우당 바카르가 이날 제일 기억에 남음
-한국인 입맛 기준으로도 무난함
-점심이나 저녁 피크 시간에는 대기가 있을 수 있음</textarea>
+        <textarea id="experienceInput" rows="8" placeholder="내가 실제로 느낀 점을 줄글이나 메모로 넣어줘요. 예: Kokas 몰 안 쌀국수집이고, 추울 때 따뜻한 국물이 먹고 싶으면 자주 간다."></textarea>
       </label>
 
       <label class="stacked">
         <span>먹은 메뉴</span>
-        <textarea id="menuInput" rows="5">사테(Sate) | 땅콩소스가 진하고 고소해서 밥이랑 잘 맞았다
-우당 바카르(Udang Bakar) | 단짠 양념과 구운 향이 좋았고 이날 제일 만족스러웠다
-자헤 마두(Jahe Madu) | 생강꿀차 같은 따뜻한 음료라 마무리로 좋았다</textarea>
+        <textarea id="menuInput" rows="5" placeholder="먹은 메뉴와 느낌을 넣어줘요. 예: 옥스테일 쌀국수 | 국물이 따뜻해서 좋았다"></textarea>
       </label>
 
       <div class="field-grid">
         <label>
           <span>한국어 검색어</span>
-          <input id="keywordKoInput" type="text" value="자카르타 맛집, 코타카사블랑카 맛집, 인도네시아 음식, 인도네시아 주재원">
+          <input id="keywordKoInput" type="text" placeholder="예: 자카르타 맛집, 코카스 쌀국수, 코타카사블랑카 맛집">
         </label>
         <label>
           <span>구글 검색어</span>
-          <input id="keywordGoogleInput" type="text" value="Pesta Kebun Kota Kasablanka, Pesta Kebun Kokas, Kota Kasablanka, Sate, Udang Bakar, Jahe Madu">
+          <input id="keywordGoogleInput" type="text" placeholder="예: Pho 24 Kokas, Kota Kasablanka, Jakarta Pho">
         </label>
         <label>
           <span>썸네일 제목</span>
-          <input id="thumbTitleInput" type="text" value="Pesta Kebun Kokas">
+          <input id="thumbTitleInput" type="text" placeholder="예: Pho 24 Kokas">
         </label>
         <label>
           <span>리본 문구</span>
-          <input id="thumbRibbonInput" type="text" value="Pilihan Orang Korea">
+          <input id="thumbRibbonInput" type="text" placeholder="예: 따뜻한 국물 맛집">
         </label>
       </div>
 
@@ -126,7 +119,7 @@ Casa Residence에서 가까워서 들르기 편함
           </div>
           <button id="saveVoiceBtn" class="secondary-btn" type="button">저장</button>
         </div>
-        <textarea id="voiceInput" rows="3">나는 성격이 급해서 대기가 길면 갈 엄두가 잘 안 나는데, 이날은 바로 앉을 수 있어서 좋았어.</textarea>
+        <textarea id="voiceInput" rows="3" placeholder="내 말투 샘플을 넣어줘요. 저장한 말투가 있으면 자동으로 보여요."></textarea>
         <div id="voicePresetList" class="chip-row"></div>
       </section>
 
@@ -173,16 +166,10 @@ Casa Residence에서 가까워서 들르기 편함
 
       <section id="naverTab" class="tab-panel is-active">
         <div class="editor-toolbar">
-          <button type="button" data-open-tab="thumbnail">썸네일 작성기</button>
-          <button type="button" data-insert="h2">단락 제목</button>
           <button type="button" data-insert="h3">메뉴 제목</button>
           <button type="button" id="toggleEditorBtn">바로 수정</button>
           <button type="button" id="savePreviewEditBtn" disabled>수정 저장</button>
           <button type="button" id="fixAiBtn">AI 느낌 줄이기</button>
-          <button type="button" id="copyStyledPostBtn">꾸민 원고 복사</button>
-          <button type="button" id="exportGoogleDocsBtn">구글문서+리포트</button>
-          <button type="button" id="copyPostBtn">원고 복사</button>
-          <button type="button" id="downloadPostBtn">원고 저장</button>
         </div>
         <div id="titleCandidates" class="title-candidates"></div>
         <article id="postPreview" class="post-preview" aria-label="사진 포함 원고 미리보기"></article>
@@ -269,6 +256,6 @@ Casa Residence에서 가까워서 들르기 편함
     </section>
   </main>
 
-  <script src="app.js?v=20260614-openai-restore"></script>
+  <script src="app.js?v=20260614-clean-start"></script>
 </body>
 </html>

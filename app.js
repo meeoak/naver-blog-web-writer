@@ -89,14 +89,14 @@ function bindEvents() {
   $("generateAiThumbBtn").addEventListener("click", generateAIThumbnailImage);
   $("clearAiThumbBtn").addEventListener("click", clearAIThumbnailImage);
   $("thumbnailCandidateList").addEventListener("click", handleThumbnailCandidateClick);
-  $("copyPostBtn").addEventListener("click", () => {
+  if ($("copyPostBtn")) $("copyPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
     copyText($("postEditor").value);
   });
-  $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
-  $("exportGoogleDocsBtn").addEventListener("click", exportToGoogleDocs);
+  if ($("copyStyledPostBtn")) $("copyStyledPostBtn").addEventListener("click", copyStyledPost);
+  if ($("exportGoogleDocsBtn")) $("exportGoogleDocsBtn").addEventListener("click", exportToGoogleDocs);
   if ($("copyBlogspotBtn")) $("copyBlogspotBtn").addEventListener("click", () => copyText($("blogspotEditor").value));
-  $("downloadPostBtn").addEventListener("click", () => {
+  if ($("downloadPostBtn")) $("downloadPostBtn").addEventListener("click", () => {
     syncPreviewEditsIfNeeded({ silent: true });
     downloadText("naver_post.md", $("postEditor").value);
   });
@@ -210,6 +210,27 @@ function getInput() {
     photoDensity: $("photoDensityInput").value || "all",
     photoCaptionMode: $("photoCaptionModeInput").value || "safe",
   };
+}
+
+function hasDraftSeed(input) {
+  const hasPhoto = state.photos.length > 0;
+  const hasStory = Boolean(input.situation || input.experience.length || input.menus.length);
+  return hasPhoto || hasStory;
+}
+
+function clearGeneratedDraft() {
+  state.titleCandidates = [];
+  state.naverPost = "";
+  state.blogspotPost = "";
+  state.tags = [];
+  state.aiSearchReport = [];
+  state.aiSearchSources = [];
+  state.isPolished = false;
+  $("postEditor").value = "";
+  if ($("blogspotEditor")) $("blogspotEditor").value = "";
+  if ($("tagEditor")) $("tagEditor").value = "";
+  renderTitleCandidates();
+  refreshReports();
 }
 
 function lines(text) {
@@ -648,6 +669,11 @@ function generateAll() {
   disableDirectPreviewEdit();
   state.isPolished = false;
   const input = getInput();
+  if (!hasDraftSeed(input)) {
+    clearGeneratedDraft();
+    drawThumbnail();
+    return;
+  }
   autoMatchPhotos(input, true);
   renderPhotos();
   state.titleCandidates = makeTitleCandidates(input);
@@ -744,6 +770,12 @@ ${tags}
 async function generateWithOpenAI() {
   const apiKey = normalizeOpenAIKey($("openaiKeyInput").value);
   const model = $("aiModelInput").value.trim() || "gpt-5.5";
+  const input = getInput();
+  if (!hasDraftSeed(input)) {
+    clearGeneratedDraft();
+    setAiStatus("사진이나 경험 메모, 먹은 메뉴를 먼저 넣어줘. 글감이 있어야 AI 원고를 만들 수 있어.", true);
+    return;
+  }
   if (!apiKey) {
     setAiStatus("OpenAI API 키를 먼저 넣어줘. ChatGPT 로그인과 API 키는 별도야.", true);
     return;
@@ -754,7 +786,6 @@ async function generateWithOpenAI() {
   }
 
   saveOpenAISettings();
-  const input = getInput();
   autoMatchPhotos(input, true);
   renderPhotos();
   setAiStatus("사진을 AI가 읽을 수 있게 준비하는 중...");
@@ -3775,13 +3806,29 @@ function downloadThumbnail() {
 
 function resetInputs() {
   if (!confirm("입력과 결과를 초기화할까요?")) return;
+  [
+    "topicInput",
+    "placeInput",
+    "dateInput",
+    "situationInput",
+    "experienceInput",
+    "menuInput",
+    "keywordKoInput",
+    "keywordGoogleInput",
+    "thumbTitleInput",
+    "thumbRibbonInput",
+  ].forEach((id) => {
+    const field = $(id);
+    if (field) field.value = "";
+  });
   state.photos = [];
   state.aiThumbnailDataUrl = "";
   state.thumbnailCandidates = [];
   state.selectedThumbnailCandidate = -1;
   renderThumbnailCandidates();
   renderPhotos();
-  generateAll();
+  clearGeneratedDraft();
+  drawThumbnail();
 }
 
 function copyText(text) {
