@@ -2788,12 +2788,103 @@ function renderCounts(text) {
   const paragraphs = lines(text).length;
   const status = withoutSpaces >= 4500 ? "최종 원고급" : withoutSpaces >= 2500 ? "보강 필요" : "짧음";
   const cls = withoutSpaces >= 4500 ? "status-good" : withoutSpaces >= 2500 ? "status-warn" : "status-bad";
+  const advice = densityAdvice(text, withoutSpaces, paragraphs);
   $("countReport").innerHTML = `
     <div class="metric-row">공백 포함: <strong>${withSpaces.toLocaleString()}</strong>자</div>
     <div class="metric-row">공백 제외: <strong>${withoutSpaces.toLocaleString()}</strong>자</div>
     <div class="metric-row">문단 수: <strong>${paragraphs}</strong>개</div>
     <div class="metric-row">밀도 판단: <span class="${cls}">${status}</span></div>
+    ${advice.length ? `
+      <div class="metric-row"><strong>구체적으로 보강할 부분</strong></div>
+      <ul class="report-list density-advice">
+        ${advice.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    ` : ""}
   `;
+}
+
+function densityAdvice(text, withoutSpaces, paragraphs) {
+  const input = getInput();
+  const advice = [];
+  const cleanText = String(text || "");
+  const compactText = cleanText.replace(/\s+/g, " ");
+  const shortage = Math.max(0, 4500 - withoutSpaces);
+  const hasDraft = cleanText.trim().length > 0;
+  if (!hasDraft) return [];
+
+  if (shortage > 0) {
+    advice.push(`전체 분량은 공백 제외 기준으로 약 ${shortage.toLocaleString()}자 더 있으면 좋아. 짧은 문장 4~8개 정도를 추가하면 돼.`);
+  }
+
+  if (paragraphs < 70) {
+    advice.push("문단 수가 적은 편이야. 긴 문단을 2~3문장 단위로 나누고, 중간에 짧은 감상 문장을 넣으면 모바일에서 더 읽기 좋아.");
+  }
+
+  if (!/(방문한 날|그날|이날|퇴근|점심|저녁|주말|비 오는|추운|더운|들렀|갔)/.test(compactText)) {
+    advice.push("첫 부분에 방문한 날의 상황을 2~3문장 더 넣어줘. 예: 왜 그날 이 식당을 골랐는지, 혼자였는지/누구와 갔는지, 대기나 자리 상황은 어땠는지.");
+  }
+
+  if (!/(위치|몰 안|층|입구|찾|가까|이동|그랩|택시|주차)/.test(compactText)) {
+    advice.push("위치와 이동 팁을 보강하면 좋아. 몰 안에서 찾기 쉬웠는지, 어느 동선으로 갔는지, 그랩/택시/주차가 편했는지를 2~3문장 추가해줘.");
+  }
+
+  if (!/(분위기|내부|자리|테이블|조명|인테리어|춥|시원|따뜻|소음|혼자|가족|친구)/.test(compactText)) {
+    advice.push("분위기 설명이 더 있으면 좋아. 매장 온도, 좌석 간격, 혼자 가기 좋은지, 친구/가족과 가기 좋은지 같은 체감 정보를 넣어줘.");
+  }
+
+  const menuAdvice = menuDensityAdvice(input, compactText);
+  advice.push(...menuAdvice);
+
+  if (!/(대기|예약|피크|시간대|자리|주말|평일|웨이팅|바로 앉)/.test(compactText)) {
+    advice.push("대기/방문 팁을 추가해줘. 피크 시간에는 기다릴 수 있는지, 언제 가면 편한지, 예약이 필요한지 정도만 넣어도 글이 훨씬 실용적으로 보여.");
+  }
+
+  const photoMarkers = (cleanText.match(/\[사진\s+\d+/g) || []).length;
+  if (state.photos.length && photoMarkers < Math.min(state.photos.length, 8)) {
+    advice.push(`사진을 ${state.photos.length}장 올렸는데 본문에는 ${photoMarkers}장만 보여. 좋은 사진 위주로 2~4장 더 넣고, 사진 아래에 실제 보이는 내용을 한 문장씩 붙여줘.`);
+  } else if (photoMarkers && !/(사진|그릇|테이블|메뉴|국물|음료|내부|분위기).{0,60}(보이|나오|느낌|좋)/.test(compactText)) {
+    advice.push("사진 위치는 있는데 사진 설명이 약해. 각 사진 아래에 '사진에서 보이는 것 + 내가 느낀 점'을 한 문장씩 넣어줘.");
+  }
+
+  if (!/(Q\.|A\.|자주 묻는 질문|FAQ)/.test(cleanText)) {
+    advice.push("FAQ가 없으면 검색 유입용으로 3~5개만 넣어줘. 예: 혼자 가도 괜찮은지, 많이 매운지, 어떤 메뉴가 무난한지, 위치가 편한지.");
+  }
+
+  if (!/(다시 갈|재방문|결론|마무리|한 번쯤|다음에도|추천)/.test(compactText)) {
+    advice.push("마지막에 재방문 여부를 분명히 써줘. '나는 어떤 상황이면 다시 갈지'를 2~3문장으로 정리하면 글이 더 완성돼 보여.");
+  }
+
+  return unique(advice).slice(0, 6);
+}
+
+function menuDensityAdvice(input, compactText) {
+  const advice = [];
+  if (!input.menus.length) {
+    if (!/(메뉴|주문|먹었|맛|국물|소스|식감|양념)/.test(compactText)) {
+      advice.push("먹은 메뉴가 잘 안 보여. 주문한 메뉴 이름, 맛, 양, 같이 먹기 좋은 조합을 최소 1단락 추가해줘.");
+    }
+    return advice;
+  }
+
+  input.menus.slice(0, 4).forEach((menu) => {
+    const names = [menu.name, menu.local].filter(Boolean);
+    const appears = names.some((name) => compactText.toLowerCase().includes(name.toLowerCase()));
+    if (!appears) {
+      advice.push(`${menu.name} 메뉴가 본문에 잘 안 보여. 이 메뉴를 왜 시켰는지, 맛/양/재주문 여부를 2~3문장 추가해줘.`);
+      return;
+    }
+
+    const menuIndex = names
+      .map((name) => compactText.toLowerCase().indexOf(name.toLowerCase()))
+      .filter((index) => index >= 0)
+      .sort((a, b) => a - b)[0];
+    const localSlice = menuIndex >= 0 ? compactText.slice(menuIndex, menuIndex + 260) : compactText;
+    if (!/(맛|국물|소스|식감|향|양념|간|매운|달|짠|고소|따뜻|차갑|양|부드럽|질기|기억|재주문)/.test(localSlice)) {
+      advice.push(`${menu.name} 설명은 이름만 있고 맛 후기가 약해. 국물/소스/식감/양/재주문 여부 중 2가지를 골라 2~3문장 더 써줘.`);
+    }
+  });
+
+  return advice;
 }
 
 function renderKeywordReport(text, tags) {
